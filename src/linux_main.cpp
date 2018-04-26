@@ -25,13 +25,15 @@
 
 #include <alsa/asoundlib.h>
 
-#include "linux_audio.h"
 #include "km_debug.h"
 #include "km_math.h"
 #include "km_input.h"
 
+#define LINUX_MAX_KEYCODES 128
+
 global_var char pathToApp_[LINUX_STATE_FILE_NAME_COUNT];
 global_var bool32 running_;
+global_var KeyInputCode toKM_[LINUX_MAX_KEYCODES];
 
 // Required GLX functions
 typedef GLXContext  glXCreateContextAttribsARBFunc(
@@ -576,12 +578,13 @@ internal inline float32 LinuxGetSecondsElapsed(
 }
 
 // TODO change this to an array or something
-internal int LinuxKeyCodeToKM(unsigned int keycode)
+internal inline KeyInputCode LinuxKeyCodeToKM(unsigned int keycode)
 {
+    return toKM_[keycode];
     // Numbers, letters, text
     // Arrow keys
     // Special keys
-    if (keycode == 9) {
+    /*if (keycode == 9) {
         return KM_KEY_ESCAPE;
     }
     else if (keycode == 65) {
@@ -604,7 +607,7 @@ internal int LinuxKeyCodeToKM(unsigned int keycode)
     }
     else {
         return -1;
-    }
+    }*/
 }
 
 internal void LinuxProcessPendingMessages(
@@ -933,13 +936,6 @@ int main(int argc, char **argv)
     }
     DEBUG_PRINT("Initialized Linux OpenGL\n");
 
-    GameAudio gameAudio_;
-    if (!LinuxInitAudio(&globalAudio,
-    AUDIO_CHANNELS, AUDIO_SAMPLERATE, AUDIO_PERIOD_SIZE, AUDIO_NUM_PERIODS)) {
-        return 1;
-    }
-    DEBUG_PRINT("Initialized Linux audio\n");
-
 #if GAME_INTERNAL
 	void* baseAddress = (void*)TERABYTES((uint64)2);;
 #else
@@ -977,6 +973,32 @@ int main(int argc, char **argv)
 	GameInput input[2] = {};
 	GameInput *newInput = &input[0];
 	GameInput *oldInput = &input[1];
+    for (int i = 0; i < LINUX_MAX_KEYCODES; i++) {
+        toKM_[i] = KM_KEY_UNMAPPED;
+    }
+
+    toKM_[9] = KM_KEY_ESCAPE;
+    toKM_[22] = KM_KEY_BACKSPACE;
+    toKM_[24] = KM_KEY_Q;
+    toKM_[25] = KM_KEY_W;
+    toKM_[26] = KM_KEY_E;
+    toKM_[27] = KM_KEY_R;
+    toKM_[28] = KM_KEY_T;
+    toKM_[29] = KM_KEY_Y;
+    toKM_[30] = KM_KEY_U;
+    toKM_[31] = KM_KEY_I;
+    toKM_[32] = KM_KEY_O;
+    toKM_[33] = KM_KEY_P;
+    toKM_[38] = KM_KEY_A;
+    toKM_[39] = KM_KEY_S;
+    toKM_[40] = KM_KEY_D;
+    toKM_[41] = KM_KEY_F;
+    toKM_[42] = KM_KEY_G;
+    toKM_[43] = KM_KEY_H;
+    toKM_[44] = KM_KEY_J;
+    toKM_[45] = KM_KEY_K;
+    toKM_[46] = KM_KEY_L;
+    toKM_[65] = KM_KEY_SPACE;
 
     struct timespec lastCounter = LinuxGetWallClock();
     struct timespec flipWallClock = LinuxGetWallClock();
@@ -987,20 +1009,6 @@ int main(int argc, char **argv)
 
     // IMPORTANT LEFTOVER NOTES:
     // Querying X11 every frame can cause hickups because of a sync of X11 state
-
-    // TODO This is actually game-specific code
-    /*uint32 runningSampleIndex = 0;
-    float32 tSine1 = 0.0f;
-    float32 tSine2 = 0.0f;*/
-
-    float toneHz = 260.0f;
-    for (uint32 i = 0; i < globalAudio.bufferSize; i++) {
-        float t = 2.0f * PI_F * toneHz * i / globalAudio.sampleRate; 
-        int16 s1 = (int16)(INT16_MAXVAL * sinf(t));
-        int16 s2 = (int16)(INT16_MAXVAL * sinf(t));
-        globalAudio.buffer[i * globalAudio.channels]        = s1;
-        globalAudio.buffer[i * globalAudio.channels + 1]    = s2;
-    }
 
     running_ = true;
     while (running_) {
@@ -1013,99 +1021,8 @@ int main(int argc, char **argv)
 			ThreadContext thread = {};
             gameCode.gameUpdateAndRender(&thread, &platformFuncs,
                 newInput, screenInfo,
-                &gameMemory, &gameAudio_);
+                &gameMemory);
         }
-
-        pthread_mutex_lock(&globalAudioMutex);
-#if 0
-        uint32 playMark = globalAudio.readIndex;
-        uint32 fillTarget = (playMark - 1) % globalAudio.bufferSize;
-        uint32 writeTo = runningSampleIndex % globalAudio.bufferSize;
-        uint32 writeLen;
-        if (writeTo == fillTarget) {
-            writeLen = globalAudio.bufferSize;
-        }
-        else if (writeTo > fillTarget) {
-            writeLen = globalAudio.bufferSize - (writeTo - fillTarget);
-        }
-        else {
-            writeLen = fillTarget - writeTo;
-        }
-        /*uint32 writeLen;
-        if (playMark < fillTarget) {
-            if (playMark <= writeTo && writeTo < fillTarget) {
-                writeLen = fillTarget - writeTo;
-            }
-            else {
-                writeLen = 0;
-            }
-        }
-        else if (playMark > fillTarget) {
-            if (fillTarget <= writeTo && writeTo < playMark) {
-                writeLen = 0;
-            }
-            else {
-                if (writeTo > fillTarget) {
-                    writeLen = globalAudio.bufferSize + fillTarget - writeTo;
-                }
-                else {
-                    writeLen = fillTarget - writeTo;
-                }
-            }
-        }
-        else {
-            // hm... strange. but remotely possible I suppose
-            writeLen = 0;
-        }*/
-
-        DEBUG_PRINT("play mark: %d, target: %d\n", playMark, fillTarget);
-        DEBUG_PRINT("writeTo: %d\n", writeTo);
-        DEBUG_PRINT("writeLen: %d / %d\n", writeLen, globalAudio.bufferSize);
-        if (newInput->keyboard[KM_KEY_SPACE].isDown
-        && newInput->keyboard[KM_KEY_SPACE].transitions > 0) {
-            DEBUG_PRINT("Paused on terminal...\n");
-            getchar();
-        }
-
-        float tone1Hz = 440.6f;
-        float tone2Hz = tone1Hz * 3.0f / 2.0f;
-        for (uint32 i = 0; i < writeLen; i++) {
-            uint32 ind = (writeTo + i) % globalAudio.bufferSize;
-            int16 s1 = (int16)(INT16_MAXVAL * sinf(tSine1));
-            int16 s2 = (int16)(INT16_MAXVAL * sinf(tSine2));
-            globalAudio.buffer[ind * globalAudio.channels]        = s1;
-            globalAudio.buffer[ind * globalAudio.channels + 1]    = s2;
-
-            tSine1 += 2.0f * PI_F * tone1Hz * 1.0f
-                / (float32)globalAudio.sampleRate;
-            tSine2 += 2.0f * PI_F * tone2Hz * 1.0f
-                / (float32)globalAudio.sampleRate;
-
-            runningSampleIndex++;
-        }
-#endif
-        if (WasKeyPressed(newInput, KM_KEY_SPACE)) {
-            toneHz *= 3.0f / 2.0f;
-            for (uint32 i = 0; i < globalAudio.bufferSize; i++) {
-                float t = 2.0f * PI_F * toneHz * i / globalAudio.sampleRate; 
-                int16 s1 = (int16)(INT16_MAXVAL * sinf(t));
-                int16 s2 = (int16)(INT16_MAXVAL * sinf(t));
-                globalAudio.buffer[i * globalAudio.channels]        = s1;
-                globalAudio.buffer[i * globalAudio.channels + 1]    = s2;
-            }
-        }
-        if (WasKeyPressed(newInput, KM_KEY_BACKSPACE)) {
-            toneHz /= 3.0f / 2.0f;
-            for (uint32 i = 0; i < globalAudio.bufferSize; i++) {
-                float t = 2.0f * PI_F * toneHz * i / globalAudio.sampleRate; 
-                int16 s1 = (int16)(INT16_MAXVAL * sinf(t));
-                int16 s2 = (int16)(INT16_MAXVAL * sinf(t));
-                globalAudio.buffer[i * globalAudio.channels]        = s1;
-                globalAudio.buffer[i * globalAudio.channels + 1]    = s2;
-            }
-        }
-
-        pthread_mutex_unlock(&globalAudioMutex);
         
         glXSwapBuffers(display, glWindow);
 
@@ -1332,8 +1249,6 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
-#include "linux_audio.cpp"
 
 // TODO temporary! this is a bad idea! already compiled in main.cpp
 #include "km_input.cpp"

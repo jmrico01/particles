@@ -93,14 +93,6 @@ struct GameInput
 	GameControllerInput controllers[4];
 };
 
-struct GameAudio
-{
-    int sampleRate;
-    int channels;
-    int bufferSizeSamples;
-    int16* buffer;
-};
-
 struct PlatformFunctions
 {
 #if GAME_INTERNAL
@@ -135,5 +127,5 @@ struct GameMemory
     const ThreadContext* thread, \
     const PlatformFunctions* platformFuncs, \
     const GameInput* input, ScreenInfo screenInfo, \
-	GameMemory* memory, GameAudio* audio)
+	GameMemory* memory)
 typedef GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRenderFunc);

@@ -65,6 +65,8 @@ enum KeyInputCode
     KM_KEY_ARROW_LEFT,
     KM_KEY_ARROW_RIGHT,
 
+    KM_KEY_UNMAPPED,
+
     KM_KEY_LAST // Always keep this at the end.
 };
 

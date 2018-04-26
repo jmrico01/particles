@@ -104,8 +104,7 @@ def WinCompileDebug():
     libs = " ".join([
         "user32.lib",
         "gdi32.lib",
-        "opengl32.lib",
-        "xaudio2.lib"
+        "opengl32.lib"
         #"freetype281MTd.lib"
     ])
 
@@ -191,8 +190,7 @@ def WinCompileRelease():
     libs = " ".join([
         "user32.lib",
         "gdi32.lib",
-        "opengl32.lib",
-        "xaudio2.lib"
+        "opengl32.lib"
         #"freetype281MTd.lib"
     ])
 
