@@ -1,0 +1,85 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "group": "build",
+            "taskName": "build-debug",
+            "type": "shell",
+            "command": "python compile/compile.py debug",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            //"group": "build", // Disabled to prevent this being default build.
+            "taskName": "build-ifchanged",
+            "type": "shell",
+            "command": "python compile/compile.py ifchanged",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "group": "build",
+            "taskName": "build-release",
+            "type": "shell",
+            "command": "python compile/compile.py release",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "group": "build",
+            "taskName": "build-external",
+            "type": "shell",
+            "command": "python compile/compile.py external",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "group": "build",
+            "taskName": "build-clean",
+            "type": "shell",
+            "command": "python compile/compile.py clean",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "group": "build",
+            "taskName": "build-debug-devenv",
+            "type": "shell",
+            "command": "python compile/compile.py debug devenv",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+    ]
+}
