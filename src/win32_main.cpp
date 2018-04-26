@@ -5,7 +5,6 @@
 #include <Xinput.h>
 #include <intrin.h> // __rdtsc
 
-#include "win32_audio.h"
 #include "opengl.h"
 #include "km_debug.h"
 #include "km_input.h"
@@ -37,12 +36,15 @@
 #define START_WIDTH 1280
 #define START_HEIGHT 800
 
+#define WIN32_MAX_KEYCODE 256
+
 // TODO this is a global for now
 global_var char pathToApp_[MAX_PATH];
 global_var bool32 running_ = true;
 global_var GameInput* input_ = nullptr;             // for WndProc WM_CHAR
 global_var glViewportFunc* glViewport_ = nullptr;   // for WndProc WM_SIZE
 global_var ScreenInfo* screenInfo_ = nullptr;       // for WndProc WM_SIZE
+global_var KeyInputCode toKM_[WIN32_MAX_KEYCODE];
 
 global_var bool32 DEBUGshowCursor_;
 global_var WINDOWPLACEMENT DEBUGwpPrev = { sizeof(DEBUGwpPrev) };
@@ -441,56 +443,43 @@ LRESULT CALLBACK WndProc(
     return result;
 }
 
-internal int Win32KeyCodeToKM(int vkCode)
+internal void Win32InitKeyCodeMap()
 {
-    // Numbers, letters, text
-    if (vkCode >= 0x30 && vkCode <= 0x39) {
-        return vkCode - 0x30 + KM_KEY_0;
+    for (int i = 0; i < WIN32_MAX_KEYCODE; i++) {
+        toKM_[i] = KM_KEY_UNMAPPED;
     }
-    else if (vkCode >= 0x41 && vkCode <= 0x5a) {
-        return vkCode - 0x41 + KM_KEY_A;
+
+    // Numbers
+    for (int i = 0x30; i < 0x3a; i++) {
+        toKM_[i] = (KeyInputCode)(i - 0x30 + KM_KEY_0);
     }
-    else if (vkCode == VK_SPACE) {
-        return KM_KEY_SPACE;
+    // Letters
+    for (int i = 0x41; i < 0x5b; i++) {
+        toKM_[i] = (KeyInputCode)(i - 0x41 + KM_KEY_A);
     }
-    else if (vkCode == VK_BACK) {
-        return KM_KEY_BACKSPACE;
-    }
+    // Other text input
+    toKM_[VK_SPACE] = KM_KEY_SPACE;
+    toKM_[VK_BACK] = KM_KEY_BACKSPACE;
     // Arrow keys
-    else if (vkCode == VK_UP) {
-        return KM_KEY_ARROW_UP;
-    }
-    else if (vkCode == VK_DOWN) {
-        return KM_KEY_ARROW_DOWN;
-    }
-    else if (vkCode == VK_LEFT) {
-        return KM_KEY_ARROW_LEFT;
-    }
-    else if (vkCode == VK_RIGHT) {
-        return KM_KEY_ARROW_RIGHT;
-    }
+    toKM_[VK_UP] = KM_KEY_ARROW_UP;
+    toKM_[VK_DOWN] = KM_KEY_ARROW_DOWN;
+    toKM_[VK_LEFT] = KM_KEY_ARROW_LEFT;
+    toKM_[VK_RIGHT] = KM_KEY_ARROW_RIGHT;
     // Special keys
-    else if (vkCode == VK_ESCAPE) {
-        return KM_KEY_ESCAPE;
+    toKM_[VK_ESCAPE] = KM_KEY_ESCAPE;
+    toKM_[VK_SHIFT] = KM_KEY_SHIFT;
+    toKM_[VK_CONTROL] = KM_KEY_CTRL;
+    toKM_[VK_TAB] = KM_KEY_TAB;
+    toKM_[VK_RETURN] = KM_KEY_ENTER;
+    // Numpad
+    for (int i = 0x60; i < 0x6a; i++) {
+        toKM_[i] = (KeyInputCode)(i - 0x60 + KM_KEY_NUMPAD_0);
     }
-    else if (vkCode == VK_SHIFT) {
-        return KM_KEY_SHIFT;
-    }
-    else if (vkCode == VK_CONTROL) {
-        return KM_KEY_CTRL;
-    }
-    else if (vkCode == VK_TAB) {
-       return KM_KEY_TAB;
-    }
-    else if (vkCode == VK_RETURN) {
-        return KM_KEY_ENTER;
-    }
-    else if (vkCode >= 0x60 && vkCode <= 0x69) {
-        return vkCode - 0x60 + KM_KEY_NUMPAD_0;
-    }
-    else {
-        return -1;
-    }
+}
+
+internal inline KeyInputCode Win32KeyCodeToKM(int vkCode)
+{
+    return toKM_[vkCode];
 }
 
 internal void Win32ProcessMessages(
@@ -522,7 +511,7 @@ internal void Win32ProcessMessages(
             DEBUG_ASSERT(isDown);
 
             int kmKeyCode = Win32KeyCodeToKM(vkCode);
-            if (kmKeyCode != -1) {
+            if (kmKeyCode != KM_KEY_UNMAPPED) {
                 gameInput->keyboard[kmKeyCode].isDown = isDown;
                 gameInput->keyboard[kmKeyCode].transitions = transitions;
             }
@@ -548,7 +537,7 @@ internal void Win32ProcessMessages(
             DEBUG_ASSERT(!isDown);
 
             int kmKeyCode = Win32KeyCodeToKM(vkCode);
-            if (kmKeyCode != -1) {
+            if (kmKeyCode != KM_KEY_UNMAPPED) {
                 gameInput->keyboard[kmKeyCode].isDown = isDown;
                 gameInput->keyboard[kmKeyCode].transitions = transitions;
             }
@@ -965,25 +954,6 @@ int CALLBACK WinMain(
         ReleaseDC(hWnd, hDC);
     }
 
-    // Initialize audio
-    Win32Audio winAudio = {};
-    uint32 bufferSizeSamples = AUDIO_SAMPLERATE
-        * AUDIO_BUFFER_SIZE_MILLISECONDS / 1000;
-    if (!Win32InitAudio(&winAudio,
-    AUDIO_SAMPLERATE, AUDIO_CHANNELS, bufferSizeSamples)) {
-        return 1;
-    }
-    winAudio.sampleLatency = AUDIO_SAMPLERATE / 10;
-
-    GameAudio gameAudio = {};
-    gameAudio.sampleRate = winAudio.sampleRate;
-    gameAudio.channels = winAudio.channels;
-    gameAudio.bufferSizeSamples = gameAudio.sampleRate;
-    gameAudio.buffer = (int16*)VirtualAlloc(0,
-        gameAudio.bufferSizeSamples * gameAudio.channels * sizeof(int16),
-        MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    DEBUG_PRINT("Initialized Win32 audio\n");
-
     // TODO probably remove this later
 #if GAME_INTERNAL
     DEBUGshowCursor_ = true;
@@ -1054,6 +1024,7 @@ int CALLBACK WinMain(
     GameInput input[2] = {};
     GameInput *newInput = &input[0];
     GameInput *oldInput = &input[1];
+    Win32InitKeyCodeMap();
 
     // Initialize timing information
     int64 timerFreq;
@@ -1069,12 +1040,6 @@ int CALLBACK WinMain(
 
     Win32GameCode gameCode =
         Win32LoadGameCode(gameCodeDLLPath, tempCodeDLLPath);
-    
-    // TODO This is actually game-specific code
-    uint32 runningSampleIndex = 0;
-    float32 tSine1 = 0.0f;
-    float32 tSine2 = 0.0f;
-    float amplitude = 1.0f;
 
     running_ = true;
     while (running_) {
@@ -1217,59 +1182,7 @@ int CALLBACK WinMain(
             ThreadContext thread = {};
             gameCode.gameUpdateAndRender(&thread, &platformFuncs,
                 newInput, screenInfo,
-                &gameMemory, &gameAudio);
-        }
-
-        XAUDIO2_VOICE_STATE voiceState;
-        winAudio.sourceVoice->GetState(&voiceState);
-        int playMark = (int)voiceState.SamplesPlayed
-            % winAudio.bufferSizeSamples;
-        int fillTarget = (playMark + winAudio.sampleLatency)
-            % winAudio.bufferSizeSamples;
-        int writeTo = runningSampleIndex % winAudio.bufferSizeSamples;
-        int writeLen;
-        if (writeTo == fillTarget) {
-            writeLen = winAudio.bufferSizeSamples;
-        }
-        else if (writeTo > fillTarget) {
-            writeLen = winAudio.bufferSizeSamples - (writeTo - fillTarget);
-        }
-        else {
-            writeLen = fillTarget - writeTo;
-        }
-
-        float baseTone = 261.0f;
-        if (newInput->controllers[0].x.isDown) {
-            amplitude -= 0.01f;
-        }
-        if (newInput->controllers[0].b.isDown) {
-            amplitude += 0.01f;
-        }
-        amplitude = ClampFloat32(amplitude, 0.0f, 1.0f);
-        float tone1Hz = baseTone
-            * (1.0f + 0.5f * newInput->controllers[0].leftEnd.x)
-            * (1.0f + 0.1f * newInput->controllers[0].leftEnd.y);
-        float tone2Hz = baseTone
-            * (1.0f + 0.5f * newInput->controllers[0].rightEnd.x)
-            * (1.0f + 0.1f * newInput->controllers[0].rightEnd.y);
-        //DEBUG_PRINT("tone freq: %f\n", tone2Hz);
-        for (int i = 0; i < writeLen; i++) {
-            uint32 ind = (writeTo + i) % winAudio.bufferSizeSamples;
-            int16 sin1Sample = (int16)(INT16_MAXVAL * amplitude * sinf(
-                /*2.0f * PI_F * tone1Hz * t*/tSine1));
-            int16 sin2Sample = (int16)(INT16_MAXVAL * amplitude * sinf(
-                /*2.0f * PI_F * tone2Hz * t*/tSine2));
-            winAudio.buffer[ind * winAudio.channels]      = sin1Sample;
-            winAudio.buffer[ind * winAudio.channels + 1]  = sin2Sample;
-
-            tSine1 += 2.0f * PI_F * tone1Hz * 1.0f
-                / (float32)winAudio.sampleRate;
-            tSine2 += 2.0f * PI_F * tone2Hz * 1.0f
-                / (float32)winAudio.sampleRate;
-
-            //gameAudio.buffer[ind * gameAudio.channels] = sinSample2;
-
-            runningSampleIndex++;
+                &gameMemory);
         }
 
         LARGE_INTEGER vsyncStart;
@@ -1314,12 +1227,8 @@ int CALLBACK WinMain(
         ClearInput(newInput, oldInput);
     }
 
-    winAudio.sourceVoice->Stop();
-
     return 0;
 }
-
-#include "win32_audio.cpp"
 
 // TODO temporary! this is a bad idea! already compiled in main.cpp
 #include "km_input.cpp"

@@ -577,37 +577,40 @@ internal inline float32 LinuxGetSecondsElapsed(
         + ((float32)(end.tv_nsec - start.tv_nsec) * 1e-9f);
 }
 
+internal void LinuxInitKeyCodeMap()
+{
+    for (int i = 0; i < LINUX_MAX_KEYCODES; i++) {
+        toKM_[i] = KM_KEY_UNMAPPED;
+    }
+
+    toKM_[9] = KM_KEY_ESCAPE;
+    toKM_[22] = KM_KEY_BACKSPACE;
+    toKM_[24] = KM_KEY_Q;
+    toKM_[25] = KM_KEY_W;
+    toKM_[26] = KM_KEY_E;
+    toKM_[27] = KM_KEY_R;
+    toKM_[28] = KM_KEY_T;
+    toKM_[29] = KM_KEY_Y;
+    toKM_[30] = KM_KEY_U;
+    toKM_[31] = KM_KEY_I;
+    toKM_[32] = KM_KEY_O;
+    toKM_[33] = KM_KEY_P;
+    toKM_[38] = KM_KEY_A;
+    toKM_[39] = KM_KEY_S;
+    toKM_[40] = KM_KEY_D;
+    toKM_[41] = KM_KEY_F;
+    toKM_[42] = KM_KEY_G;
+    toKM_[43] = KM_KEY_H;
+    toKM_[44] = KM_KEY_J;
+    toKM_[45] = KM_KEY_K;
+    toKM_[46] = KM_KEY_L;
+    toKM_[65] = KM_KEY_SPACE;
+}
+
 // TODO change this to an array or something
 internal inline KeyInputCode LinuxKeyCodeToKM(unsigned int keycode)
 {
     return toKM_[keycode];
-    // Numbers, letters, text
-    // Arrow keys
-    // Special keys
-    /*if (keycode == 9) {
-        return KM_KEY_ESCAPE;
-    }
-    else if (keycode == 65) {
-        return KM_KEY_SPACE;
-    }
-    else if (keycode == 22) {
-        return KM_KEY_BACKSPACE;
-    }
-    else if (keycode == 25) {
-        return KM_KEY_W;
-    }
-    else if (keycode == 38) {
-        return KM_KEY_A;
-    }
-    else if (keycode == 39) {
-        return KM_KEY_S;
-    }
-    else if (keycode == 40) {
-        return KM_KEY_D;
-    }
-    else {
-        return -1;
-    }*/
 }
 
 internal void LinuxProcessPendingMessages(
@@ -690,7 +693,7 @@ internal void LinuxProcessPendingMessages(
 
                 //DEBUG_PRINT("key code: %d\n", event.xkey.keycode);
                 int kmKeyCode = LinuxKeyCodeToKM(event.xkey.keycode);
-                if (kmKeyCode != -1) {
+                if (kmKeyCode != KM_KEY_UNMAPPED) {
                     input->keyboard[kmKeyCode].isDown = isDown;
                     input->keyboard[kmKeyCode].transitions = transitions;
                 }
@@ -973,32 +976,7 @@ int main(int argc, char **argv)
 	GameInput input[2] = {};
 	GameInput *newInput = &input[0];
 	GameInput *oldInput = &input[1];
-    for (int i = 0; i < LINUX_MAX_KEYCODES; i++) {
-        toKM_[i] = KM_KEY_UNMAPPED;
-    }
-
-    toKM_[9] = KM_KEY_ESCAPE;
-    toKM_[22] = KM_KEY_BACKSPACE;
-    toKM_[24] = KM_KEY_Q;
-    toKM_[25] = KM_KEY_W;
-    toKM_[26] = KM_KEY_E;
-    toKM_[27] = KM_KEY_R;
-    toKM_[28] = KM_KEY_T;
-    toKM_[29] = KM_KEY_Y;
-    toKM_[30] = KM_KEY_U;
-    toKM_[31] = KM_KEY_I;
-    toKM_[32] = KM_KEY_O;
-    toKM_[33] = KM_KEY_P;
-    toKM_[38] = KM_KEY_A;
-    toKM_[39] = KM_KEY_S;
-    toKM_[40] = KM_KEY_D;
-    toKM_[41] = KM_KEY_F;
-    toKM_[42] = KM_KEY_G;
-    toKM_[43] = KM_KEY_H;
-    toKM_[44] = KM_KEY_J;
-    toKM_[45] = KM_KEY_K;
-    toKM_[46] = KM_KEY_L;
-    toKM_[65] = KM_KEY_SPACE;
+    LinuxInitKeyCodeMap();
 
     struct timespec lastCounter = LinuxGetWallClock();
     struct timespec flipWallClock = LinuxGetWallClock();

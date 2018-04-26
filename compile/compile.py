@@ -234,6 +234,9 @@ def WinCompileRelease():
         "popd"
     ]))
 
+def WinRun():
+    os.system(paths["build"] + os.sep + PROJECT_NAME + "_win32.exe")
+
 def LinuxCompileDebug():
     macros = " ".join([
         "-DGAME_INTERNAL=1",
@@ -449,14 +452,22 @@ def Clean():
             # ... exceptions are so ugly.
             print e
 
+def Run():
+    platformName = platform.system()
+    if platformName == "Windows":
+        WinRun()
+    else:
+        print "Unsupported platform: " + platformName
+
 def Main():
     if not os.path.exists(paths["build"]):
         os.makedirs(paths["build"])
 
-    arg1 = ""
-    if len(sys.argv) > 1:
-        arg1 = sys.argv[1]
+    if (len(sys.argv) <= 1):
+        print("Compile script expected at least one argument")
+        return
 
+    arg1 = sys.argv[1]
     if arg1 == "debug":
         Debug()
     elif arg1 == "ifchanged":
@@ -465,7 +476,9 @@ def Main():
         Release()
     elif arg1 == "clean":
         Clean()
+    elif arg1 == "run":
+        Run()
     else:
-        print("Compile script expected one argument")
+        print("Unrecognized argument: " + arg1)
 
 Main()
