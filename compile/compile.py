@@ -121,7 +121,7 @@ def WinCompileDebug():
         "cl",
         macros, compilerFlags, compilerWarningFlags, includePaths,
         "/LD", "/Fe" + PROJECT_NAME + "_game.dll", paths["main-cpp"],
-        "/link", linkerFlags, #libPaths, libs,
+        "/link", linkerFlags, libPaths, libs,
         "/EXPORT:GameUpdateAndRender", "/PDB:" + pdbName])
 
     compileCommand = " ".join([

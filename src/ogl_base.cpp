@@ -4,39 +4,13 @@
 //#include FT_FREETYPE_H
 #include <stdlib.h>
 
+#include "opengl_global.h"
+#include "opengl.h"
 #include "km_debug.h"
 #include "km_defines.h"
 #include "km_math.h"
 
-#if 0
-
-// TODO get this out of here
-global_var Mat4 pixelToClip_;
-
-void InitOpenGL()
-{
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
-}
-
-void ResizeGL(int width, int height)
-{
-    glViewport(0, 0, (GLsizei)width, (GLsizei)height);
-
-    Vec3 pixelScale = {
-        2.0f / (float)width,
-        2.0f / (float)height,
-        1.0f
-    };
-    Vec3 view = { -1.0f, -1.0f, 0.0f };
-    pixelToClip_ = Translate(view) * Scale(pixelScale);
-}
-#endif
+#define OGL_INFO_LOG_LENGTH_MAX 512
 
 internal bool CompileAndCheckShader(GLuint shaderID,
     DEBUGReadFileResult shaderFile)
@@ -49,17 +23,18 @@ internal bool CompileAndCheckShader(GLuint shaderID,
 
     // Check shader.
     GLint result;
-    int infoLogLength;
     glGetShaderiv(shaderID, GL_COMPILE_STATUS, &result);
-    glGetShaderiv(shaderID, GL_INFO_LOG_LENGTH, &infoLogLength);
     if (result == GL_FALSE) {
-        // TODO get rid of this malloc
-        char* infoLog = (char*)malloc((size_t)(infoLogLength + 1));
+        char infoLog[OGL_INFO_LOG_LENGTH_MAX];
+        int infoLogLength;
+        glGetShaderiv(shaderID, GL_INFO_LOG_LENGTH, &infoLogLength);
+        if (infoLogLength > OGL_INFO_LOG_LENGTH_MAX) {
+            infoLogLength = OGL_INFO_LOG_LENGTH_MAX;
+        }
         glGetShaderInfoLog(shaderID, infoLogLength, NULL, infoLog);
-        infoLog[infoLogLength] = 0;
+        infoLog[infoLogLength] = '\0';
         DEBUG_PRINT("Shader compilation log:\n");
         DEBUG_PRINT("%s\n", infoLog);
-        free(infoLog);
 
         return false;
     }
@@ -67,11 +42,10 @@ internal bool CompileAndCheckShader(GLuint shaderID,
     return true;
 }
 
-GLuint LoadShaders(
-	const ThreadContext* thread,
+GLuint LoadShaders(const ThreadContext* thread,
+    const char* vertFilePath, const char* fragFilePath,
 	DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
-	DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory,
-    const char* vertFilePath, const char* fragFilePath)
+	DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
 {
     // Create GL shaders.
     GLuint vertShaderID = glCreateShader(GL_VERTEX_SHADER);
@@ -114,17 +88,18 @@ GLuint LoadShaders(
 
     // Check the shader program.
     GLint result;
-    int infoLogLength;
     glGetProgramiv(programID, GL_LINK_STATUS, &result);
-    glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &infoLogLength);
     if (result == GL_FALSE) {
-        // TODO get rid of this malloc
-        char* infoLog = (char*)malloc((size_t)(infoLogLength + 1));
+        char infoLog[OGL_INFO_LOG_LENGTH_MAX];
+        int infoLogLength;
+        glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &infoLogLength);
+        if (infoLogLength > OGL_INFO_LOG_LENGTH_MAX) {
+            infoLogLength = OGL_INFO_LOG_LENGTH_MAX;
+        }
         glGetProgramInfoLog(programID, infoLogLength, NULL, infoLog);
-        infoLog[infoLogLength] = 0;
+        infoLog[infoLogLength] = '\0';
         DEBUG_PRINT("Program linking failed:\n");
         DEBUG_PRINT("%s\n", infoLog);
-        free(infoLog);
 
         return 0; // TODO what to return
     }
@@ -140,8 +115,9 @@ GLuint LoadShaders(
     return programID;
 }
 
-#if 0
-RectGL CreateRectGL()
+RectGL InitRectGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
 {
     RectGL rectGL;
     const GLfloat vertices[] = {
@@ -172,14 +148,16 @@ RectGL CreateRectGL()
 
     glBindVertexArray(0);
 
-    rectGL.programID = LoadShaders(
-        "shaders/rect.vert",
-        "shaders/rect.frag");
+    rectGL.programID = LoadShaders(thread,
+        "shaders/rect.vert", "shaders/rect.frag",
+        DEBUGPlatformReadFile, DEBUGPlatformFreeFileMemory);
     
     return rectGL;
 }
 
-TexturedRectGL CreateTexturedRectGL()
+TexturedRectGL InitTexturedRectGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
 {
     TexturedRectGL texturedRectGL;
     // TODO probably use indexing for this
@@ -232,14 +210,16 @@ TexturedRectGL CreateTexturedRectGL()
 
     glBindVertexArray(0);
 
-    texturedRectGL.programID = LoadShaders(
-        "shaders/texturedRect.vert",
-        "shaders/texturedRect.frag");
+    texturedRectGL.programID = LoadShaders(thread,
+        "shaders/texturedRect.vert", "shaders/texturedRect.frag",
+        DEBUGPlatformReadFile, DEBUGPlatformFreeFileMemory);
     
     return texturedRectGL;
 }
 
-LineGL CreateLineGL()
+LineGL InitLineGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
 {
     LineGL lineGL;
     const GLfloat vertices[] = {
@@ -266,39 +246,57 @@ LineGL CreateLineGL()
 
     glBindVertexArray(0);
 
-    lineGL.programID = LoadShaders(
-        "shaders/line.vert",
-        "shaders/line.frag");
+    lineGL.programID = LoadShaders(thread,
+        "shaders/line.vert", "shaders/line.frag",
+        DEBUGPlatformReadFile, DEBUGPlatformFreeFileMemory);
     
     return lineGL;
 }
 
-void DrawRect(
-    RectGL rectGL,
-    Vec3 pos, Vec2 anchor, Vec2 size, Vec4 color)
+struct RectCoordsNDC
 {
+    Vec3 pos;
+    Vec2 size;
+};
+internal RectCoordsNDC ToRectCoordsNDC(Vec2Int pos, Vec2Int size, Vec2 anchor,
+    ScreenInfo screenInfo)
+{
+    RectCoordsNDC result;
+    result.pos = { (float32)pos.x, (float32)pos.y, 0.0f };
+    result.size = { (float32)size.x, (float32)size.y };
+    result.pos.x -= anchor.x * result.size.x;
+    result.pos.y -= anchor.y * result.size.y;
+    result.pos.x = result.pos.x * 2.0f / screenInfo.size.x - 1.0f;
+    result.pos.y = result.pos.y * 2.0f / screenInfo.size.y - 1.0f;
+    result.size.x *= 2.0f / screenInfo.size.x;
+    result.size.y *= 2.0f / screenInfo.size.y;
+    return result;
+}
+
+void DrawRect(RectGL rectGL, ScreenInfo screenInfo,
+    Vec2Int pos, Vec2 anchor, Vec2Int size, Vec4 color)
+{
+    RectCoordsNDC ndc = ToRectCoordsNDC(pos, size, anchor, screenInfo);
+
     GLint loc;
     glUseProgram(rectGL.programID);
-    pos.x -= anchor.x * size.x;
-    pos.y -= anchor.y * size.y;
     loc = glGetUniformLocation(rectGL.programID, "posBottomLeft");
-    glUniform3fv(loc, 1, &pos.e[0]);
+    glUniform3fv(loc, 1, &ndc.pos.e[0]);
     loc = glGetUniformLocation(rectGL.programID, "size");
-    glUniform2fv(loc, 1, &size.e[0]);
+    glUniform2fv(loc, 1, &ndc.size.e[0]);
     loc = glGetUniformLocation(rectGL.programID, "color");
     glUniform4fv(loc, 1, &color.e[0]);
-    loc = glGetUniformLocation(rectGL.programID, "pixelToClip");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, &pixelToClip_.e[0][0]);
 
     glBindVertexArray(rectGL.vertexArray);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 }
 
-void DrawTexturedRect(
-    TexturedRectGL texturedRectGL,
-    Vec3 pos, Vec2 anchor, Vec2 size, GLuint texture)
+void DrawTexturedRect(TexturedRectGL texturedRectGL, ScreenInfo screenInfo,
+    Vec2Int pos, Vec2 anchor, Vec2Int size, GLuint texture)
 {
+    RectCoordsNDC ndc = ToRectCoordsNDC(pos, size, anchor, screenInfo);
+
     GLint loc;
     glUseProgram(texturedRectGL.programID);
 
@@ -307,23 +305,18 @@ void DrawTexturedRect(
     loc = glGetUniformLocation(texturedRectGL.programID, "textureSampler");
     glUniform1i(loc, 0);
 
-    pos.x -= anchor.x * size.x;
-    pos.y -= anchor.y * size.y;
     loc = glGetUniformLocation(texturedRectGL.programID, "posBottomLeft");
-    glUniform3fv(loc, 1, &pos.e[0]);
+    glUniform3fv(loc, 1, &ndc.pos.e[0]);
     loc = glGetUniformLocation(texturedRectGL.programID, "size");
-    glUniform2fv(loc, 1, &size.e[0]);
-    loc = glGetUniformLocation(texturedRectGL.programID, "pixelToClip");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, &pixelToClip_.e[0][0]);
+    glUniform2fv(loc, 1, &ndc.size.e[0]);
 
     glBindVertexArray(texturedRectGL.vertexArray);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 }
 
-void DrawLine(
-    LineGL lineGL, Mat4 proj, Mat4 view,
-    Vec3 v1, Vec3 v2, Vec4 color)
+void DrawLine(LineGL lineGL,
+    Mat4 proj, Mat4 view, Vec3 v1, Vec3 v2, Vec4 color)
 {
     GLint loc;
     glUseProgram(lineGL.programID);
@@ -343,4 +336,3 @@ void DrawLine(
     glDrawArrays(GL_LINES, 0, 2);
     glBindVertexArray(0);
 }
-#endif
