@@ -7,23 +7,18 @@
 
 #define INPUT_BUFFER_SIZE 2048
 
-enum ClickStateFlags {
-    CLICKSTATE_NONE = 0,
-    CLICKSTATE_LEFT_PRESS = 1 << 0,
-    CLICKSTATE_RIGHT_PRESS = 1 << 1
-};
-
 struct Button;
-
+struct InputField;
 typedef void (*ButtonCallback)(Button*, void*);
+typedef void (*InputFieldCallback)(InputField*, void*);
 
 struct ClickableBox
 {
-    Vec2 origin;
-    Vec2 size;
+    Vec2Int origin;
+    Vec2Int size;
 
-    bool hovered;
-    bool pressed;
+    bool32 hovered;
+    bool32 pressed;
 
     Vec4 color;
     Vec4 hoverColor;
@@ -43,23 +38,26 @@ struct InputField
     ClickableBox box;
     char text[INPUT_BUFFER_SIZE];
     uint32 textLen;
+    InputFieldCallback callback;
     Vec4 textColor;
 };
 
-ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
+ClickableBox CreateClickableBox(Vec2Int origin, Vec2Int size,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor);
-Button CreateButton(Vec2 origin, Vec2 size,
+Button CreateButton(Vec2Int origin, Vec2Int size,
     const char* text, ButtonCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
-InputField CreateInputField(Vec2 origin, Vec2 size, const char* text,
+InputField CreateInputField(Vec2Int origin, Vec2Int size,
+    const char* text, InputFieldCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
 
 void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,
-    Vec2 mousePos, int clickState);
-void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL);
+    const GameInput* input);
+void DrawClickableBoxes(ClickableBox boxes[], uint32 n,
+    RectGL rectGL);
 
 void UpdateButtons(Button buttons[], uint32 n,
-    Vec2 mousePos, int clickState, void* data);
+    const GameInput* input, void* data);
 void DrawButtons(Button buttons[], uint32 n,
     RectGL rectGL, TextGL textGL, const FontFace& face);
 

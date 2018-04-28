@@ -1,11 +1,15 @@
 #pragma once
 #define MAX_GLYPHS 128
 
-#include <GL/glew.h>
+#undef internal // Required to build FreeType
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#define internal static
 
+#include "opengl.h"
+#include "opengl_global.h"
 #include "km_math.h"
+#include "main_platform.h"
 
 struct TextGL
 {
@@ -16,8 +20,8 @@ struct TextGL
 };
 struct GlyphInfo
 {
-    unsigned int width;
-    unsigned int height;
+    uint32 width;
+    uint32 height;
     int offsetX;
     int offsetY;
     int advanceX;
@@ -28,19 +32,23 @@ struct GlyphInfo
 struct FontFace
 {
     GLuint atlasTexture;
-    unsigned int height;
+    uint32 height;
     GlyphInfo glyphInfo[MAX_GLYPHS];
 };
 
-TextGL CreateTextGL();
-FontFace LoadFontFace(
+TextGL InitTextGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
+FontFace LoadFontFace(const ThreadContext* thread,
     FT_Library library,
-    const char* path, unsigned int height);
+    const char* path, uint32 height,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
 
 int GetTextWidth(const FontFace& face, const char* text);
-void DrawText(
-    TextGL textGL, const FontFace& face,
-    const char* text, Vec3 pos, Vec2 anchor, Vec4 color);
-void DrawText(
-    TextGL textGL, const FontFace& face,
-    const char* text, Vec3 pos, Vec4 color);
+void DrawText(TextGL textGL, const FontFace& face, ScreenInfo screenInfo,
+    const char* text,
+    Vec2Int pos, Vec4 color);
+void DrawText(TextGL textGL, const FontFace& face, ScreenInfo screenInfo,
+    const char* text,
+    Vec2Int pos, Vec2 anchor, Vec4 color);

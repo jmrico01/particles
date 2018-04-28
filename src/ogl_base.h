@@ -26,10 +26,21 @@ struct LineGL
     GLuint programID;
 };
 
+struct RectCoordsNDC
+{
+    Vec3 pos;
+    Vec2 size;
+};
+
+RectCoordsNDC ToRectCoordsNDC(Vec2Int pos, Vec2Int size,
+    ScreenInfo screenInfo);
+RectCoordsNDC ToRectCoordsNDC(Vec2Int pos, Vec2Int size, Vec2 anchor,
+    ScreenInfo screenInfo);
+
 GLuint LoadShaders(const ThreadContext* thread,
-	DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
-	DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory,
-    const char* vertFilePath, const char* fragFilePath);
+    const char* vertFilePath, const char* fragFilePath,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
 
 RectGL InitRectGL(const ThreadContext* thread,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
@@ -41,6 +52,7 @@ LineGL InitLineGL(const ThreadContext* thread,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
     DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
 
+// TODO this API is unrealistic and dumb. I need a batch draw function
 void DrawRect(RectGL rectGL, ScreenInfo screenInfo,
     Vec2Int pos, Vec2 anchor, Vec2Int size, Vec4 color);
 void DrawTexturedRect(TexturedRectGL texturedRectGL, ScreenInfo screenInfo,

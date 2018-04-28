@@ -2,6 +2,7 @@
 
 #include "km_math.h"
 #include "ogl_base.h"
+#include "text.h"
 
 struct GameState
 {
@@ -10,4 +11,10 @@ struct GameState
 
     RectGL rectGL;
     LineGL lineGL;
+    TextGL textGL;
+
+    FT_Library ftLibrary;
+    FontFace fontFaceSmall;
+    FontFace fontFaceMedium;
+    FontFace fontFaceLarge;
 };

@@ -8,6 +8,7 @@
 #include "opengl.h"
 #include "opengl_global.h"
 #include "ogl_base.h"
+#include "text.h"
 
 #define DEFAULT_CAM_Z 3.0f
 #define CAM_ZOOM_STEP 0.999f
@@ -52,7 +53,8 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 		// Depth buffer transforms -1 to 1 range to 0 to 1 range
 		glDepthRange(0.0, 1.0);
 
-		glDisable(GL_BLEND);
+		glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         gameState->cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
         gameState->modelRot = QuatFromAngleUnitAxis(PI_F / 6.0f, Vec3::unitX)
@@ -62,6 +64,26 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
         gameState->lineGL = InitLineGL(thread,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->textGL = InitTextGL(thread,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+
+        FT_Error error = FT_Init_FreeType(&gameState->ftLibrary);
+        if (error) {
+            DEBUG_PRINT("FreeType init error: %d\n", error);
+        }
+        gameState->fontFaceSmall = LoadFontFace(thread, gameState->ftLibrary,
+            "data/fonts/computer-modern/serif.ttf", 14,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->fontFaceMedium = LoadFontFace(thread, gameState->ftLibrary,
+            "data/fonts/computer-modern/serif.ttf", 18,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->fontFaceLarge = LoadFontFace(thread, gameState->ftLibrary,
+            "data/fonts/computer-modern/serif.ttf", 24,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
 
@@ -141,7 +163,11 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     // DrawLine(gameState->lineGL, proj, view,
     //     -Vec3::unitX * DEBUG_AXES_HALF_LENGTH, Vec3::zero,
     //     Vec4 { 0.5f, 0.0f, 0.0f, 1.0f });
+
+    DrawText(gameState->textGL, gameState->fontFaceLarge, screenInfo,
+        "Hello Sailor", Vec2Int { 100, 100 }, Vec4::one);
 }
 
-#include "ogl_base.cpp"
 #include "km_input.cpp"
+#include "ogl_base.cpp"
+#include "text.cpp"

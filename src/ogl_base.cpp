@@ -42,6 +42,36 @@ internal bool CompileAndCheckShader(GLuint shaderID,
     return true;
 }
 
+RectCoordsNDC ToRectCoordsNDC(Vec2Int pos, Vec2Int size,
+    ScreenInfo screenInfo)
+{
+    RectCoordsNDC result;
+    result.pos = {
+        2.0f * pos.x / screenInfo.size.x - 1.0f,
+        2.0f * pos.y / screenInfo.size.y - 1.0f,
+        0.0f
+    };
+    result.size = {
+        2.0f * size.x / screenInfo.size.x,
+        2.0f * size.y / screenInfo.size.y
+    };
+    return result;
+}
+RectCoordsNDC ToRectCoordsNDC(Vec2Int pos, Vec2Int size, Vec2 anchor,
+    ScreenInfo screenInfo)
+{
+    RectCoordsNDC result;
+    result.pos = { (float32)pos.x, (float32)pos.y, 0.0f };
+    result.size = { (float32)size.x, (float32)size.y };
+    result.pos.x -= anchor.x * result.size.x;
+    result.pos.y -= anchor.y * result.size.y;
+    result.pos.x = result.pos.x * 2.0f / screenInfo.size.x - 1.0f;
+    result.pos.y = result.pos.y * 2.0f / screenInfo.size.y - 1.0f;
+    result.size.x *= 2.0f / screenInfo.size.x;
+    result.size.y *= 2.0f / screenInfo.size.y;
+    return result;
+}
+
 GLuint LoadShaders(const ThreadContext* thread,
     const char* vertFilePath, const char* fragFilePath,
 	DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
@@ -119,14 +149,15 @@ RectGL InitRectGL(const ThreadContext* thread,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
     DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
 {
+    // TODO I don't even need this stupid shit. Jeez, I'm dumb...
     RectGL rectGL;
     const GLfloat vertices[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+        0.0f, 0.0f
     };
 
     glGenVertexArrays(1, &rectGL.vertexArray);
@@ -139,7 +170,7 @@ RectGL InitRectGL(const ThreadContext* thread,
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(
         0, // match shader layout location
-        3, // size (vec3)
+        2, // size (vec2)
         GL_FLOAT, // type
         GL_FALSE, // normalized?
         0, // stride
@@ -162,12 +193,12 @@ TexturedRectGL InitTexturedRectGL(const ThreadContext* thread,
     TexturedRectGL texturedRectGL;
     // TODO probably use indexing for this
     const GLfloat vertices[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+        0.0f, 0.0f
     };
     const GLfloat uvs[] = {
         0.0f, 0.0f,
@@ -188,7 +219,7 @@ TexturedRectGL InitTexturedRectGL(const ThreadContext* thread,
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(
         0, // match shader layout location
-        3, // size (vec3)
+        2, // size (vec2)
         GL_FLOAT, // type
         GL_FALSE, // normalized?
         0, // stride
@@ -251,26 +282,6 @@ LineGL InitLineGL(const ThreadContext* thread,
         DEBUGPlatformReadFile, DEBUGPlatformFreeFileMemory);
     
     return lineGL;
-}
-
-struct RectCoordsNDC
-{
-    Vec3 pos;
-    Vec2 size;
-};
-internal RectCoordsNDC ToRectCoordsNDC(Vec2Int pos, Vec2Int size, Vec2 anchor,
-    ScreenInfo screenInfo)
-{
-    RectCoordsNDC result;
-    result.pos = { (float32)pos.x, (float32)pos.y, 0.0f };
-    result.size = { (float32)size.x, (float32)size.y };
-    result.pos.x -= anchor.x * result.size.x;
-    result.pos.y -= anchor.y * result.size.y;
-    result.pos.x = result.pos.x * 2.0f / screenInfo.size.x - 1.0f;
-    result.pos.y = result.pos.y * 2.0f / screenInfo.size.y - 1.0f;
-    result.size.x *= 2.0f / screenInfo.size.x;
-    result.size.y *= 2.0f / screenInfo.size.y;
-    return result;
 }
 
 void DrawRect(RectGL rectGL, ScreenInfo screenInfo,

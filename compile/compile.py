@@ -42,19 +42,9 @@ paths["main-cpp"]       = paths["src"] + "/main.cpp"
 paths["linux-main-cpp"] = paths["src"] + "/linux_main.cpp"
 paths["win32-main-cpp"] = paths["src"] + "/win32_main.cpp"
 
-"""
-paths["include-glew"]       = paths["external"] + "/glew-2.1.0/include"
-paths["include-glfw"]       = paths["external"] + "/glfw-3.2.1/include"
-paths["include-freetype"]   = paths["external"] + "/freetype-2.8.1/include"
-paths["include-lodepng"]    = paths["external"] + "/lodepng/include"
-
-paths["lib-glfw-win-d"] = paths["external"] + "/glfw-3.2.1/lib/win/debug"
-paths["lib-glfw-win-r"] = paths["external"] + "/glfw-3.2.1/lib/win/release"
-paths["lib-glfw-linux"] = paths["external"] + "/glfw-3.2.1/lib/linux"
-paths["lib-ft-win-d"]   = paths["external"] + "/freetype-2.8.1/lib/win/debug"
-paths["lib-ft-win-r"]   = paths["external"] + "/freetype-2.8.1/lib/win/release"
-paths["lib-ft-linux"]   = paths["external"] + "/freetype-2.8.1/lib/linux"
-"""
+# TODO think of a better way of doing this
+paths["include-freetype-win"] = "D:/Development/Libraries/freetype-2.8.1/include"
+paths["lib-freetype-win"] = "D:/Development/Libraries/freetype-2.8.1/objs/vc2010/x64"
 
 paths["src-hashes"]     = paths["build"] + "/src_hashes"
 paths["src-hashes-old"] = paths["build"] + "/src_hashes_old"
@@ -90,8 +80,7 @@ def WinCompileDebug():
         "/wd4505",  # unreferenced local function has been removed
     ])
     includePaths = " ".join([
-        #"/I" + paths["include-freetype"],
-        #"/I" + paths["include-lodepng"]
+        "/I" + paths["include-freetype-win"]
     ])
 
     linkerFlags = " ".join([
@@ -99,13 +88,13 @@ def WinCompileDebug():
         "/opt:ref"          # get rid of extraneous linkages
     ])
     libPaths = " ".join([
-        #"/LIBPATH:" + paths["lib-ft-win-d"]
+        "/LIBPATH:" + paths["lib-freetype-win"]
     ])
     libs = " ".join([
         "user32.lib",
         "gdi32.lib",
-        "opengl32.lib"
-        #"freetype281MTd.lib"
+        "opengl32.lib",
+        "freetype281MTd.lib"
     ])
 
     # Clear old PDB files
