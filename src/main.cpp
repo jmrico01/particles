@@ -9,6 +9,7 @@
 #include "opengl_global.h"
 #include "ogl_base.h"
 #include "text.h"
+#include "gui.h"
 
 #define DEFAULT_CAM_Z 3.0f
 #define CAM_ZOOM_STEP 0.999f
@@ -171,3 +172,4 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 #include "km_input.cpp"
 #include "ogl_base.cpp"
 #include "text.cpp"
+#include "gui.cpp"

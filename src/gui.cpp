@@ -1,12 +1,13 @@
 #include "gui.h"
 
 #include <map>
+#include <cstring>
 
 #include "km_math.h"
 #include "ogl_base.h"
 #include "text.h"
 
-ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
+ClickableBox CreateClickableBox(Vec2Int origin, Vec2Int size,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor)
 {
     ClickableBox box = {};
@@ -23,7 +24,7 @@ ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
     return box;
 }
 
-Button CreateButton(Vec2 origin, Vec2 size,
+Button CreateButton(Vec2Int origin, Vec2Int size,
     const char* text, ButtonCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
@@ -41,7 +42,8 @@ Button CreateButton(Vec2 origin, Vec2 size,
     return button;
 }
 
-InputField CreateInputField(Vec2 origin, Vec2 size, const char* text,
+InputField CreateInputField(Vec2Int origin, Vec2Int size,
+    const char* text, InputFieldCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
     InputField inputField = {};
@@ -58,16 +60,20 @@ InputField CreateInputField(Vec2 origin, Vec2 size, const char* text,
 }
 
 void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,
-    Vec2 mousePos, int clickState)
+    const GameInput* input)
 {
-    for (uint32 i = 0; i < n; i++) {
-        Vec2 boxOrigin = boxes[i].origin;
-        Vec2 boxSize = boxes[i].size;
+    Vec2Int mousePos = input->mousePos;
 
-        if ((mousePos.x >= boxOrigin.x && mousePos.x <= boxOrigin.x + boxSize.x)
-        && (mousePos.y >= boxOrigin.y && mousePos.y <= boxOrigin.y + boxSize.y)) {
+    for (uint32 i = 0; i < n; i++) {
+        Vec2Int boxOrigin = boxes[i].origin;
+        Vec2Int boxSize = boxes[i].size;
+
+        if ((mousePos.x >= boxOrigin.x
+        && mousePos.x <= boxOrigin.x + boxSize.x) &&
+        (mousePos.y >= boxOrigin.y
+        && mousePos.y <= boxOrigin.y + boxSize.y)) {
             boxes[i].hovered = true;
-            boxes[i].pressed = (clickState & CLICKSTATE_LEFT_PRESS) != 0;
+            boxes[i].pressed = input->mouseButtons[0].isDown;
         }
         else {
             boxes[i].hovered = false;
@@ -76,10 +82,10 @@ void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,
     }
 }
 
-void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL)
+void DrawClickableBoxes(ClickableBox boxes[], uint32 n,
+    RectGL rectGL, ScreenInfo screenInfo)
 {
     for (uint32 i = 0; i < n; i++) {
-        Vec3 pos = { boxes[i].origin.x, boxes[i].origin.y, 0.0f };
         Vec4 color = boxes[i].color;
         if (boxes[i].hovered) {
             color = boxes[i].hoverColor;
@@ -88,17 +94,18 @@ void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL)
             color = boxes[i].pressColor;
         }
 
-        DrawRect(rectGL, pos, Vec2::zero, boxes[i].size, color);
+        DrawRect(rectGL, screenInfo,
+            boxes[i].origin, Vec2::zero, boxes[i].size, color);
     }
 }
 
 void UpdateButtons(Button buttons[], uint32 n,
-    Vec2 mousePos, int clickState, void* data)
+    const GameInput* input, void* data)
 {
     for (uint32 i = 0; i < n; i++) {
-        bool wasPressed = buttons[i].box.pressed;
+        bool32 wasPressed = buttons[i].box.pressed;
         // TODO unfortunate... SOA would be cool
-        UpdateClickableBoxes(&buttons[i].box, 1, mousePos, clickState);
+        UpdateClickableBoxes(&buttons[i].box, 1, input);
 
         if (buttons[i].box.hovered && wasPressed && !buttons[i].box.pressed) {
             buttons[i].callback(&buttons[i], data);
@@ -107,20 +114,20 @@ void UpdateButtons(Button buttons[], uint32 n,
 }
 
 void DrawButtons(Button buttons[], uint32 n,
-    RectGL rectGL, TextGL textGL, const FontFace& face)
+    RectGL rectGL, TextGL textGL, const FontFace& face, ScreenInfo screenInfo)
 {
     for (uint32 i = 0; i < n; i++) {
-        DrawClickableBoxes(&buttons[i].box, 1, rectGL);
-        Vec3 textPos = {
-            buttons[i].box.origin.x, buttons[i].box.origin.y, 0.0f
-        };
-        DrawText(textGL, face, buttons[i].text,
-            textPos, buttons[i].textColor);
+        DrawClickableBoxes(&buttons[i].box, 1, rectGL, screenInfo);
+        Vec2Int pos = buttons[i].box.origin + buttons[i].box.size / 2;
+        Vec2 anchor = { 0.5f, 0.5f };
+        DrawText(textGL, face, screenInfo,
+            buttons[i].text,
+            pos, anchor, buttons[i].textColor);
     }
 }
 
 void UpdateInputFields(InputField fields[], uint32 n,
-    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
+    const GameInput* input, void* data)
 {
     // TODO this is horribly hacky
     static std::map<uint64, int> focus;
@@ -131,58 +138,63 @@ void UpdateInputFields(InputField fields[], uint32 n,
 
     bool anyPressed = false;
     for (uint32 i = 0; i < n; i++) {
-        UpdateClickableBoxes(&fields[i].box, 1, mousePos, clickState);
+        UpdateClickableBoxes(&fields[i].box, 1, input);
         
         if (fields[i].box.pressed) {
             // TODO picks the last one for now. sort based on Z?
-            //printf("new input focus: %d\n", i);
+            //DEBUG_PRINT("new input focus: %d\n", i);
             focus[fieldsID] = i;
             anyPressed = true;
         }
     }
 
-    if (focus[fieldsID] != -1 && (clickState & CLICKSTATE_LEFT_PRESS) != 0
+    if (focus[fieldsID] != -1 && input->mouseButtons[0].isDown
     && !anyPressed) {
-        //printf("lost focus\n");
+        //DEBUG_PRINT("lost focus\n");
         focus[fieldsID] = -1;
     }
 
     // TODO mysterious bug: can't type in more than 16 characters...
-    if (focus[fieldsID] != -1 && keyBufSize != 0) {
-        //printf("size: %d\n", (int)sizeof(fields[focus]));
-        for (uint32 i = 0; i < keyBufSize; i++) {
-            if (!keyBuf[i].pressed) {
-                continue;
-            }
-
-            if (keyBuf[i].ascii == 8) {
-                //printf(">> backspaced\n");
+    if (focus[fieldsID] != -1 && input->keyboardStringLen != 0) {
+        //DEBUG_PRINT("size: %d\n", (int)sizeof(fields[focus]));
+        for (uint32 i = 0; i < input->keyboardStringLen; i++) {
+            if (input->keyboardString[i] == 8) {
+                //DEBUG_PRINT(">> backspaced\n");
                 if (fields[focus[fieldsID]].textLen > 0) {
                     fields[focus[fieldsID]].textLen--;
                 }
             }
+            else if (input->keyboardString[i] == 13) {
+                //DEBUG_PRINT(">> CR (enter, at last in Windows)\n");
+                fields[focus[fieldsID]].callback(&fields[focus[fieldsID]],
+                    data);
+            }
             else if (fields[focus[fieldsID]].textLen < INPUT_BUFFER_SIZE - 1) {
-                //printf("added %c\n", keyBuf[i].ascii);
-                //printf("textLen before: %d\n", fields[focus].textLen);
+                //DEBUG_PRINT("added %c\n", input->keyboardString[i].ascii);
+                //DEBUG_PRINT("textLen before: %d\n", fields[focus].textLen);
                 fields[focus[fieldsID]].text[fields[focus[fieldsID]].textLen++]
-                    = keyBuf[i].ascii;
+                    = input->keyboardString[i];
             }
         }
         fields[focus[fieldsID]].text[fields[focus[fieldsID]].textLen] = '\0';
-        //printf("new focus (%d) length: %d\n", focus, fields[focus].textLen);
+        //DEBUG_PRINT("new focus (%d) length: %d\n",
+        //    focus, fields[focus].textLen);
         for (uint32 i = 0; i < fields[focus[fieldsID]].textLen; i++) {
-            //printf("chardump: %c\n", fields[focus].text[i]);
+            //DEBUG_PRINT("chardump: %c\n", fields[focus].text[i]);
         }
-        //printf("new text: %s\n", fields[focus].text);
+        //DEBUG_PRINT("new text: %s\n", fields[focus].text);
     }
 }
 
 void DrawInputFields(InputField fields[], uint32 n,
-    RectGL rectGL, TextGL textGL, const FontFace& face)
+    RectGL rectGL, TextGL textGL, const FontFace& face, ScreenInfo screenInfo)
 {
     for (uint32 i = 0; i < n; i++) {
-        DrawClickableBoxes(&fields[i].box, 1, rectGL);
-        Vec3 textPos = { fields[i].box.origin.x, fields[i].box.origin.y, 0.0f };
-        DrawText(textGL, face, fields[i].text, textPos, fields[i].textColor);
+        DrawClickableBoxes(&fields[i].box, 1, rectGL, screenInfo);
+        Vec2Int pos = fields[i].box.origin + fields[i].box.size / 2;
+        Vec2 anchor = { 0.5f, 0.5f };
+        DrawText(textGL, face, screenInfo,
+            fields[i].text,
+            pos, anchor, fields[i].textColor);
     }
 }

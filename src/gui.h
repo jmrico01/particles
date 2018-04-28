@@ -54,14 +54,14 @@ InputField CreateInputField(Vec2Int origin, Vec2Int size,
 void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,
     const GameInput* input);
 void DrawClickableBoxes(ClickableBox boxes[], uint32 n,
-    RectGL rectGL);
+    RectGL rectGL, ScreenInfo screenInfo);
 
 void UpdateButtons(Button buttons[], uint32 n,
     const GameInput* input, void* data);
 void DrawButtons(Button buttons[], uint32 n,
-    RectGL rectGL, TextGL textGL, const FontFace& face);
+    RectGL rectGL, TextGL textGL, const FontFace& face, ScreenInfo screenInfo);
 
 void UpdateInputFields(InputField fields[], uint32 n,
-    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize);
+    const GameInput* input, void* data);
 void DrawInputFields(InputField fields[], uint32 n,
-    RectGL rectGL, TextGL textGL, const FontFace& face);
+    RectGL rectGL, TextGL textGL, const FontFace& face, ScreenInfo screenInfo);
