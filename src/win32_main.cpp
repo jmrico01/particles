@@ -746,7 +746,7 @@ internal bool Win32InitOpenGL(OpenGLFunctions* glFuncs,
     wglSwapInterval = (wglSwapIntervalEXTFunc*)
         wglGetProcAddress("wglSwapIntervalEXT");
     if (wglSwapInterval) {
-        wglSwapInterval(1);
+        wglSwapInterval(0);
     }
     else {
         // TODO no vsync. logging? just exit? just exit for now
@@ -969,7 +969,7 @@ int CALLBACK WinMain(
     gameMemory.DEBUGShouldInitGlobalFuncs = true;
 
     gameMemory.permanentStorageSize = MEGABYTES(64);
-    gameMemory.transientStorageSize = GIGABYTES(1);
+    gameMemory.transientStorageSize = MEGABYTES(1);
 
     // TODO Look into using large virtual pages for this
     // potentially big allocation
@@ -1177,11 +1177,24 @@ int CALLBACK WinMain(
             gameMemory.isInitialized = false;
         }
 #endif
+        
+        LARGE_INTEGER timerEnd;
+        QueryPerformanceCounter(&timerEnd);
+        uint64 cyclesEnd = __rdtsc();
+        int64 cyclesElapsed = cyclesEnd - cyclesLast;
+        int64 timerElapsed = timerEnd.QuadPart - timerLast.QuadPart;
+        float64 elapsed = (float64)timerElapsed / timerFreq;
+        float64 fps = (float64)timerFreq / timerElapsed;
+        int32 mCyclesPerFrame = (int32)(cyclesElapsed / (1000 * 1000));
+        timerLast = timerEnd;
+        cyclesLast = cyclesEnd;
+        /*DEBUG_PRINT("%fs/f, %ff/s, %dMc/f\n",
+            elapsed, fps, mCyclesPerFrame);*/
 
         if (gameCode.gameUpdateAndRender) {
             ThreadContext thread = {};
             gameCode.gameUpdateAndRender(&thread, &platformFuncs,
-                newInput, screenInfo,
+                newInput, screenInfo, (float32)elapsed,
                 &gameMemory);
         }
 
@@ -1202,24 +1215,24 @@ int CALLBACK WinMain(
         float32 vsyncElapsedMS = 1000.0f * vsyncElapsed / timerFreq;
         //DEBUG_PRINT("SwapBuffers took %f ms\n", vsyncElapsedMS);
 
-        LARGE_INTEGER timerEnd;
-        QueryPerformanceCounter(&timerEnd);
-        uint64 cyclesEnd = __rdtsc();
+        // LARGE_INTEGER timerEnd;
+        // QueryPerformanceCounter(&timerEnd);
+        // uint64 cyclesEnd = __rdtsc();
 
-        int64 cyclesElapsed = cyclesEnd - cyclesLast;
-        int64 timerElapsed = timerEnd.QuadPart - timerLast.QuadPart;
-        float32 elapsedMS = 1000.0f * timerElapsed / timerFreq;
-        float32 fps = (float32)timerFreq / timerElapsed;
-        int32 mCyclesPerFrame = (int32)(cyclesElapsed / (1000 * 1000));
+        // int64 cyclesElapsed = cyclesEnd - cyclesLast;
+        // int64 timerElapsed = timerEnd.QuadPart - timerLast.QuadPart;
+        // float32 elapsedMS = 1000.0f * timerElapsed / timerFreq;
+        // float32 fps = (float32)timerFreq / timerElapsed;
+        // int32 mCyclesPerFrame = (int32)(cyclesElapsed / (1000 * 1000));
 
-        /*DEBUG_PRINT("Rest of loop took %d ms\n",
-            elapsedMS - vsyncElapsedMS);*/
+        // /*DEBUG_PRINT("Rest of loop took %d ms\n",
+        //     elapsedMS - vsyncElapsedMS);*/
 
-        /*DEBUG_PRINT("%fms/f, %ff/s, %dMc/f\n",
-            elapsedMS, fps, mCyclesPerFrame);*/
+        // /*DEBUG_PRINT("%fms/f, %ff/s, %dMc/f\n",
+        //     elapsedMS, fps, mCyclesPerFrame);*/
 
-        timerLast = timerEnd;
-        cyclesLast = cyclesEnd;
+        // timerLast = timerEnd;
+        // cyclesLast = cyclesEnd;
 
         GameInput *temp = newInput;
         newInput = oldInput;

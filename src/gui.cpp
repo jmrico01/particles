@@ -53,6 +53,7 @@ InputField CreateInputField(Vec2Int origin, Vec2Int size,
     inputField.textLen = (uint32)strnlen(text, INPUT_BUFFER_SIZE - 1);
     strncpy(inputField.text, text, inputField.textLen);
     inputField.text[inputField.textLen] = '\0';
+    inputField.callback = callback;
 
     inputField.textColor = textColor;
 

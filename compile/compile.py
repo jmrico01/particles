@@ -46,6 +46,10 @@ paths["win32-main-cpp"] = paths["src"] + "/win32_main.cpp"
 paths["include-freetype-win"] = "D:/Development/Libraries/freetype-2.8.1/include"
 paths["lib-freetype-win"] = "D:/Development/Libraries/freetype-2.8.1/objs/vc2010/x64"
 
+paths["include-libpng-win"] = "D:/Development/Libraries/lpng1634"
+paths["lib-libpng-win-d"] = "D:/Development/Libraries/lpng1634/projects/vstudio/x64/DebugLibrary"
+paths["lib-libpng-win-r"] = "D:/Development/Libraries/lpng1634/projects/vstudio/x64/ReleaseLibrary"
+
 paths["src-hashes"]     = paths["build"] + "/src_hashes"
 paths["src-hashes-old"] = paths["build"] + "/src_hashes_old"
 
@@ -80,7 +84,8 @@ def WinCompileDebug():
         "/wd4505",  # unreferenced local function has been removed
     ])
     includePaths = " ".join([
-        "/I" + paths["include-freetype-win"]
+        "/I" + paths["include-freetype-win"],
+        "/I" + paths["include-libpng-win"]
     ])
 
     linkerFlags = " ".join([
@@ -88,13 +93,16 @@ def WinCompileDebug():
         "/opt:ref"          # get rid of extraneous linkages
     ])
     libPaths = " ".join([
-        "/LIBPATH:" + paths["lib-freetype-win"]
+        "/LIBPATH:" + paths["lib-freetype-win"],
+        "/LIBPATH:" + paths["lib-libpng-win-d"]
     ])
     libs = " ".join([
         "user32.lib",
         "gdi32.lib",
         "opengl32.lib",
-        "freetype281MTd.lib"
+        "freetype281MTd.lib",
+        "libpng16.lib",
+        "zlib.lib"
     ])
 
     # Clear old PDB files
@@ -165,8 +173,8 @@ def WinCompileRelease():
         "/wd4505",  # unreferenced local function has been removed
     ])
     includePaths = " ".join([
-        #"/I" + paths["include-freetype"],
-        #"/I" + paths["include-lodepng"]
+        "/I" + paths["include-freetype-win"],
+        "/I" + paths["include-libpng-win"]
     ])
 
     linkerFlags = " ".join([
@@ -174,13 +182,16 @@ def WinCompileRelease():
         "/opt:ref"          # get rid of extraneous linkages
     ])
     libPaths = " ".join([
-        #"/LIBPATH:" + paths["lib-ft-win-d"]
+        "/LIBPATH:" + paths["lib-freetype-win"],
+        "/LIBPATH:" + paths["lib-libpng-win-r"]
     ])
     libs = " ".join([
         "user32.lib",
         "gdi32.lib",
-        "opengl32.lib"
-        #"freetype281MTd.lib"
+        "opengl32.lib",
+        "freetype281MT.lib",
+        "libpng16.lib",
+        "zlib.lib"
     ])
 
     # Clear old PDB files
@@ -196,7 +207,7 @@ def WinCompileRelease():
         "cl",
         macros, compilerFlags, compilerWarningFlags, includePaths,
         "/LD", "/Fe" + PROJECT_NAME + "_game.dll", paths["main-cpp"],
-        "/link", linkerFlags, #libPaths, libs,
+        "/link", linkerFlags, libPaths, libs,
         "/EXPORT:GameUpdateAndRender", "/PDB:" + pdbName])
 
     compileCommand = " ".join([

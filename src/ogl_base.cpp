@@ -4,7 +4,7 @@
 //#include FT_FREETYPE_H
 #include <stdlib.h>
 
-#include "opengl_global.h"
+#include "opengl_funcs.h"
 #include "opengl.h"
 #include "km_debug.h"
 #include "km_defines.h"

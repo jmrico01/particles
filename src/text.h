@@ -7,7 +7,7 @@
 #define internal static
 
 #include "opengl.h"
-#include "opengl_global.h"
+#include "opengl_funcs.h"
 #include "km_math.h"
 #include "main_platform.h"
 

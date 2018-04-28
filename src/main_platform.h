@@ -127,5 +127,6 @@ struct GameMemory
     const ThreadContext* thread, \
     const PlatformFunctions* platformFuncs, \
     const GameInput* input, ScreenInfo screenInfo, \
+    float32 deltaTime, \
 	GameMemory* memory)
 typedef GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRenderFunc);

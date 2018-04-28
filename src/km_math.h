@@ -860,17 +860,17 @@ Mat4 UnitQuatToMat4(Quat q)
 {
 	Mat4 result;
 	result.e[0][0] = 1.0f - 2.0f * (q.y*q.y + q.z*q.z);
-	result.e[0][1] = 2.0f * (q.x*q.y + q.w*q.z);
-	result.e[0][2] = 2.0f * (q.x*q.z - q.w*q.y);
+	result.e[0][1] = 2.0f * (q.x*q.y + q.z*q.w);
+	result.e[0][2] = 2.0f * (q.x*q.z - q.y*q.w);
 	result.e[0][3] = 0.0f;
 
-	result.e[1][0] = 2.0f * (q.x*q.y - q.w*q.z);
+	result.e[1][0] = 2.0f * (q.x*q.y - q.z*q.w);
 	result.e[1][1] = 1.0f - 2.0f * (q.x*q.x + q.z*q.z);
-	result.e[1][2] = 2.0f * (q.y*q.z + q.w*q.x);
+	result.e[1][2] = 2.0f * (q.y*q.z + q.x*q.w);
 	result.e[1][3] = 0.0f;
 
-	result.e[2][0] = 2.0f * (q.x*q.z + q.w*q.y);
-	result.e[2][1] = 2.0f * (q.y*q.z - q.w*q.x);
+	result.e[2][0] = 2.0f * (q.x*q.z + q.y*q.w);
+	result.e[2][1] = 2.0f * (q.y*q.z - q.x*q.w);
 	result.e[2][2] = 1.0f - 2.0f * (q.x*q.x + q.y*q.y);
 	result.e[2][3] = 0.0f;
 

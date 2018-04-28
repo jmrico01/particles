@@ -6,14 +6,34 @@
 #include "km_input.h"
 #include "km_math.h"
 #include "opengl.h"
-#include "opengl_global.h"
-#include "ogl_base.h"
-#include "text.h"
-#include "gui.h"
+#include "opengl_funcs.h"
+#include "load_png.h"
 
 #define DEFAULT_CAM_Z 3.0f
 #define CAM_ZOOM_STEP 0.999f
 #define CAM_MOVE_STEP 0.25f
+
+#define UI_MARGIN 20
+#define UI_ITEM_SPACING 6
+
+const Vec4 defaultIdleColor = { 0.2f, 0.2f, 0.2f, 1.0f };
+const Vec4 defaultHoverColor = { 0.55f, 0.55f, 0.45f, 1.0f };
+const Vec4 defaultPressColor = { 0.8f, 0.8f, 0.65f, 1.0f };
+const Vec4 defaultTextColor = { 0.9f, 0.9f, 0.9f, 1.0f };
+
+const Vec4 interestIdleColor = { 0.2f, 0.4f, 0.4f, 1.0f };
+const Vec4 interestHoverColor = { 0.4f, 0.6f, 0.6f, 1.0f };
+const Vec4 interestPressColor = { 0.6f, 0.8f, 0.8f, 1.0f };
+const Vec4 interestTextColor = { 0.7f, 0.9f, 0.9f, 1.0f };
+
+void InputFieldCallbackTest(InputField* inputField, void* data)
+{
+    DEBUG_PRINT("hello");
+}
+void ButtonCallbackTest(Button* inputField, void* data)
+{
+    DEBUG_PRINT("sailor");
+}
 
 extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 {
@@ -48,7 +68,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 		//	front objects have z = -1, far objects have z = 1
 		glEnable(GL_DEPTH_TEST);
 		// Nearer objects have less z than farther objects
-		glDepthFunc(GL_LESS);
+		glDepthFunc(GL_LEQUAL);
 		// Depth buffer clears to farthest z-value (1)
 		glClearDepth(1.0);
 		// Depth buffer transforms -1 to 1 range to 0 to 1 range
@@ -64,10 +84,16 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         gameState->rectGL = InitRectGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->texturedRectGL = InitTexturedRectGL(thread,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
         gameState->lineGL = InitLineGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
         gameState->textGL = InitTextGL(thread,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->psGL = InitParticleSystemGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
 
@@ -87,6 +113,28 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             "data/fonts/computer-modern/serif.ttf", 24,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
+
+        CreateParticleSystem(&gameState->ps, MAX_PARTICLES);
+
+        gameState->textureID = LoadPNGOpenGL(thread, "data/textures/base.png", platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+
+        gameState->inputField = CreateInputField(
+            Vec2Int { UI_MARGIN, 500 }, Vec2Int { 200, 30 },
+            "Huh?", &InputFieldCallbackTest,
+            defaultIdleColor,
+            defaultHoverColor,
+            defaultPressColor,
+            defaultTextColor
+        );
+        gameState->button = CreateButton(
+            Vec2Int { 500, UI_MARGIN }, Vec2Int { 200, 30 },
+            "Squish This", &ButtonCallbackTest,
+            defaultIdleColor,
+            defaultHoverColor,
+            defaultPressColor,
+            defaultTextColor
+        );
 
 		memory->isInitialized = true;
 	}
@@ -115,28 +163,52 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         gameState->cameraPos.x += CAM_MOVE_STEP;
     }
 
+    UpdateInputFields(&gameState->inputField, 1, input, (void*)gameState);
+    UpdateButtons(&gameState->button, 1, input, (void*)gameState);
+
+    UpdateParticleSystem(&gameState->ps, deltaTime);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Assignment title & name
+    DrawText(gameState->textGL, gameState->fontFaceLarge, screenInfo,
+        "Particles & Animation",
+        Vec2Int { UI_MARGIN, screenInfo.size.y - UI_MARGIN },
+        Vec2 { 0.0f, 1.0f },
+        interestTextColor
+    );
+    DrawText(gameState->textGL, gameState->fontFaceLarge, screenInfo,
+        "Jose M Rico <jrico>",
+        Vec2Int {
+            UI_MARGIN,
+            screenInfo.size.y - UI_MARGIN
+                - (int)gameState->fontFaceLarge.height - UI_ITEM_SPACING
+        },
+        Vec2 { 0.0f, 1.0f },
+        interestTextColor
+    );
+
+    // FPS counter
+    char fpsString[512];
+    sprintf(fpsString, "FPS: %f", 1.0 / deltaTime);
+    DrawText(gameState->textGL, gameState->fontFaceMedium, screenInfo,
+        fpsString,
+        Vec2Int {
+            screenInfo.size.x - UI_MARGIN,
+            screenInfo.size.y - UI_MARGIN
+        },
+        Vec2 { 1.0f, 1.0f },
+        interestTextColor
+    );
 
     Mat4 proj = Projection(110.0f,
         (float32)screenInfo.size.x / (float32)screenInfo.size.y,
         0.1f, 10.0f);
-    Mat4 view = Translate(-gameState->cameraPos);
-    Mat4 model = UnitQuatToMat4(gameState->modelRot);
-    view = view * model;
-
-    // TEST
-    Vec4 color = Vec4 { 1.0f, 0.0f, 1.0f, 1.0f };
-    if (input->mouseButtons[0].isDown) {
-        color.g = 0.5f;
-    }
-    if (input->mouseButtons[1].isDown) {
-        color.r = 0.5f;
-    }
-    DrawRect(gameState->rectGL, screenInfo,
-        input->mousePos,
-        Vec2 { 0.5f, 0.5f },
-        Vec2Int { 40, 40 },
-        color);
+    Mat4 view = Translate(-gameState->cameraPos)
+        * UnitQuatToMat4(gameState->modelRot);
+    Mat4 vp = proj * view;
+    //Mat4 model = UnitQuatToMat4(gameState->modelRot);
+    //view = view * model;
 
     const float DEBUG_AXES_HALF_LENGTH = 5.0f;
 #if GAME_INTERNAL
@@ -165,11 +237,23 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     //     -Vec3::unitX * DEBUG_AXES_HALF_LENGTH, Vec3::zero,
     //     Vec4 { 0.5f, 0.0f, 0.0f, 1.0f });
 
-    DrawText(gameState->textGL, gameState->fontFaceLarge, screenInfo,
-        "Hello Sailor", Vec2Int { 100, 100 }, Vec4::one);
+    DrawInputFields(&gameState->inputField, 1,
+        gameState->rectGL, gameState->textGL,
+        gameState->fontFaceMedium, screenInfo);
+    DrawButtons(&gameState->button, 1,
+        gameState->rectGL, gameState->textGL,
+        gameState->fontFaceMedium, screenInfo);
+
+    // Get camera right and up vectors for billboard draw
+    Vec3 camRight = { view.e[0][0], view.e[1][0], view.e[2][0] };
+    Vec3 camUp = { view.e[0][1], view.e[1][1], view.e[2][1] };
+    DrawParticleSystem(gameState->psGL, &gameState->ps,
+        gameState->textureID, camRight, camUp, vp);
 }
 
 #include "km_input.cpp"
 #include "ogl_base.cpp"
 #include "text.cpp"
 #include "gui.cpp"
+#include "load_png.cpp"
+#include "particles.cpp"

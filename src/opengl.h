@@ -20,10 +20,13 @@
 #define GL_FLOAT					0x1406
 #define GL_DOUBLE					0x140A
 
-#define GL_LINES					0x0001
-#define GL_LINE_LOOP				0x0002
-#define GL_LINE_STRIP				0x0003
-#define GL_TRIANGLES				0x0004
+#define GL_POINTS                   0x0000
+#define GL_LINES                    0x0001
+#define GL_LINE_LOOP                0x0002
+#define GL_LINE_STRIP               0x0003
+#define GL_TRIANGLES                0x0004
+#define GL_TRIANGLE_STRIP           0x0005
+#define GL_TRIANGLE_FAN             0x0006
 
 #define GL_DEPTH_BUFFER_BIT			0x00000100
 #define GL_STENCIL_BUFFER_BIT		0x00000400
@@ -100,6 +103,8 @@
 #define GL_ALPHA                    0x1906
 #define GL_RGB                      0x1907
 #define GL_RGBA                     0x1908
+#define GL_BGR                      0x80E0
+#define GL_BGRA                     0x80E1
 
 #define GL_TEXTURE0 				0x84C0
 #define GL_TEXTURE1					0x84C1
@@ -161,7 +166,8 @@ typedef float64	GLdouble;
 typedef float64	GLclampd;
 
 typedef uint32	GLsizei;
-typedef size_t	GLsizeiptr;
+typedef ptrdiff_t   GLsizeiptr;
+typedef ptrdiff_t   GLintptr;
 
 #endif
 
@@ -206,11 +212,13 @@ typedef size_t	GLsizeiptr;
 	FUNC(void,	glGenBuffers, GLsizei n, GLuint* buffers) \
 	FUNC(void,	glBindBuffer, GLenum target, GLuint buffer) \
 	FUNC(void,	glBufferData, GLenum target, GLsizeiptr size, const GLvoid* data, GLenum usage) \
+    FUNC(void,  glBufferSubData, GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data) \
 	FUNC(void,	glBindVertexArray, GLuint array) \
 	FUNC(void,	glDeleteVertexArrays, GLsizei n, const GLuint* arrays) \
 	FUNC(void,	glGenVertexArrays, GLsizei n, GLuint* arrays) \
 	FUNC(void,	glEnableVertexAttribArray, GLuint index) \
 	FUNC(void,	glVertexAttribPointer, GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* pointer) \
+    FUNC(void,  glVertexAttribDivisor, GLuint index, GLuint divisor) \
 \
 	FUNC(void,	glUseProgram, GLuint program) \
 	FUNC(GLint,	glGetUniformLocation, GLuint program, const GLchar* name) \
@@ -242,7 +250,8 @@ typedef size_t	GLsizeiptr;
     FUNC(void,  glPixelStorei, GLenum pname, GLint param) \
 \
 	FUNC(void,	glDrawArrays, GLenum mode, GLint first, GLsizei count) \
-	FUNC(void,	glDrawElements, GLenum mode, GLsizei count, GLenum type, const void *indices)
+	FUNC(void,	glDrawElements, GLenum mode, GLsizei count, GLenum type, const void *indices) \
+    FUNC(void,  glDrawArraysInstanced, GLenum mode, GLint first, GLsizei count, GLsizei primcount)
 
 // Generate function declarations
 #define FUNC(returntype, name, ...) \
