@@ -290,12 +290,12 @@ PlaneGL InitPlaneGL(const ThreadContext* thread,
 {
     PlaneGL planeGL;
     const GLfloat vertices[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f,
+        1.0f, -1.0f, 0.0f,
         1.0f, 1.0f, 0.0f,
         1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f
+        -1.0f, 1.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f
     };
 
     glGenVertexArrays(1, &planeGL.vertexArray);
@@ -463,8 +463,27 @@ void DrawLine(LineGL lineGL,
     glBindVertexArray(0);
 }
 
+void DrawPlane(PlaneGL planeGL,
+    Mat4 vp, Vec3 point, Vec3 normal, Vec4 color)
+{
+    GLint loc;
+    glUseProgram(planeGL.programID);
+
+    Mat4 model = Translate(point)
+        * UnitQuatToMat4(QuatRotBetweenVectors(Vec3::unitZ, normal));
+    Mat4 mvp = vp * model;
+    loc = glGetUniformLocation(planeGL.programID, "mvp");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);
+    loc = glGetUniformLocation(planeGL.programID, "color");
+    glUniform4fv(loc, 1, &color.e[0]);
+
+    glBindVertexArray(planeGL.vertexArray);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
 void DrawBox(BoxGL boxGL,
-    Mat4 mvp, Vec3 min, Vec3 max, Vec4 color)
+    Mat4 vp, Vec3 min, Vec3 max, Vec4 color)
 {
     GLint loc;
     glUseProgram(boxGL.programID);
@@ -474,7 +493,7 @@ void DrawBox(BoxGL boxGL,
     loc = glGetUniformLocation(boxGL.programID, "max");
     glUniform3fv(loc, 1, &max.e[0]);
     loc = glGetUniformLocation(boxGL.programID, "mvp");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &vp.e[0][0]);
     loc = glGetUniformLocation(boxGL.programID, "color");
     glUniform4fv(loc, 1, &color.e[0]);
 

@@ -16,6 +16,8 @@
 #define UI_MARGIN 20
 #define UI_SPACING 6
 
+const char* defaultMesh_ = "bunny.obj";
+
 const Vec4 defaultIdleColor = { 0.2f, 0.2f, 0.2f, 1.0f };
 const Vec4 defaultHoverColor = { 0.55f, 0.55f, 0.45f, 1.0f };
 const Vec4 defaultPressColor = { 0.8f, 0.8f, 0.65f, 1.0f };
@@ -25,6 +27,14 @@ const Vec4 interestIdleColor = { 0.2f, 0.4f, 0.4f, 1.0f };
 const Vec4 interestHoverColor = { 0.4f, 0.6f, 0.6f, 1.0f };
 const Vec4 interestPressColor = { 0.6f, 0.8f, 0.8f, 1.0f };
 const Vec4 interestTextColor = { 0.7f, 0.9f, 0.9f, 1.0f };
+
+struct ChangeMeshData
+{
+    GameState* gameState;
+    const ThreadContext* thread;
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile;
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory;
+};
 
 internal inline float32 RandFloat()
 {
@@ -36,16 +46,8 @@ internal inline float32 RandFloat(float32 min, float32 max)
     return RandFloat() * (max - min) + min;
 }
 
-internal void InputFieldCallbackTest(InputField* inputField, void* data)
-{
-    DEBUG_PRINT("hello");
-}
-internal void ButtonCallbackTest(Button* inputField, void* data)
-{
-    DEBUG_PRINT("sailor");
-}
-
-internal void InitParticleRandom(ParticleSystem* ps, Particle* particle)
+internal void InitParticleRandom(ParticleSystem* ps, Particle* particle,
+    void* data)
 {
     particle->life = 0.0f;
     particle->pos = Vec3::zero;
@@ -67,7 +69,8 @@ internal void InitParticleRandom(ParticleSystem* ps, Particle* particle)
     particle->bounceMult = 1.0f;
 }
 
-internal void InitParticleFountain(ParticleSystem* ps, Particle* particle)
+internal void InitParticleFountain(ParticleSystem* ps, Particle* particle,
+    void* data)
 {
     particle->life = 0.0f;
     particle->pos = Vec3::unitY * 0.5f;
@@ -90,10 +93,11 @@ internal void InitParticleFountain(ParticleSystem* ps, Particle* particle)
     };
     float randSize = RandFloat() * 0.1f + 0.05f;
     particle->size = { randSize, randSize };
-    particle->bounceMult = RandFloat(0.5f, 1.0f);
+    particle->bounceMult = RandFloat(0.6f, 1.0f);
 }
 
-internal void InitParticleSphere(ParticleSystem* ps, Particle* particle)
+internal void InitParticleSphere(ParticleSystem* ps, Particle* particle,
+    void* data)
 {
     const float32 radius = 2.0f;
 
@@ -116,6 +120,266 @@ internal void InitParticleSphere(ParticleSystem* ps, Particle* particle)
     float randSize = RandFloat() * 0.1f + 0.05f;
     particle->size = { randSize, randSize };
     particle->bounceMult = 1.0f;
+}
+
+internal Vec3 RandomPointInTriangle(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 normal)
+{
+    // Picks random point in parallelogram (v0, v1, v2, v1+v2)
+    // Source: http://mathworld.wolfram.com/TrianglePointPicking.html
+    Vec3 v0v1 = v1 - v0;
+    Vec3 v0v2 = v2 - v0;
+    float32 a1 = RandFloat();
+    float32 a2 = RandFloat();
+    Vec3 randPt = a1 * v0v1 + a2 * v0v2 + v0;
+
+    // "Folds" the outside points into the triangle (my code)
+    Vec3 out = Normalize(Cross(v2 - v1, normal));
+    float32 dotOut = Dot(randPt - v1, out);
+    if (dotOut > 0.0f) {
+        randPt -= dotOut * out;
+        return Vec3::zero;
+    }
+
+    return randPt;
+}
+
+internal void InitParticleMesh(ParticleSystem* ps, Particle* particle,
+    void* data)
+{
+    Mesh* mesh = ps->mesh;
+    // First, pick a random face, weighted by its area
+    float32 totalArea = 0.0f;
+    for (int i = 0; i < (int)mesh->triangles.size; i++) {
+        totalArea += mesh->triangles[i].area;
+    }
+    float32 randFace = RandFloat(0.0f, totalArea);
+    totalArea = 0.0f;
+    int face = -1;
+    for (int i = 0; i < (int)mesh->triangles.size; i++) {
+        totalArea += mesh->triangles[i].area;
+        if (totalArea >= randFace) {
+            face = i;
+            break;
+        }
+    }
+    DEBUG_ASSERT(face != -1);
+
+    Triangle triangle = mesh->triangles[face];
+    Vec3 normal = (triangle.n[0] + triangle.n[1] + triangle.n[2]) / 3.0f;
+    particle->life = 0.0f;
+    particle->pos = RandomPointInTriangle(
+        triangle.v[0], triangle.v[1], triangle.v[2], normal);
+    // Minimal velocity
+    float32 speed = RandFloat(-0.01f, 0.01f);
+    particle->vel = speed * normal;
+    particle->color = { 
+        RandFloat(),
+        RandFloat(),
+        RandFloat(),
+        1.0f
+    };
+    float randSize = RandFloat() * 0.04f + 0.02f;
+    particle->size = { randSize, randSize };
+    particle->bounceMult = 1.0f;
+}
+
+internal void InitParticleSphereJet(ParticleSystem* ps, Particle* particle,
+    void* data)
+{
+    particle->life = 0.0f;
+    particle->pos = Vec3::unitZ * 3.0f;
+    float32 spread = RandFloat(0.0f, 0.5f);
+    Vec2 circleVel = {
+        RandFloat() - 0.5f,
+        RandFloat() - 0.5f
+    };
+    circleVel = Normalize(circleVel) * spread;
+    particle->vel = {
+        circleVel.x,
+        circleVel.y,
+        -RandFloat(2.0f, 4.0f)
+    };
+    particle->color = {
+        RandFloat(0.6f, 1.0f),
+        RandFloat(0.2f, 1.0f),
+        RandFloat(0.0f, 1.0f),
+        1.0f
+    };
+    float randSize = RandFloat() * 0.1f + 0.05f;
+    particle->size = { randSize, randSize };
+    particle->bounceMult = RandFloat(0.6f, 1.0f);
+}
+
+internal void PresetChange(Button* button, void* data)
+{
+    GameState* gameState = (GameState*)data;
+
+    Preset preset = PRESET_LAST;
+    for (int i = 0; i < PRESET_LAST; i++) {
+        gameState->presetButtons[i].box.color = defaultIdleColor;
+        gameState->presetButtons[i].box.hoverColor = defaultHoverColor;
+        gameState->presetButtons[i].box.pressColor = defaultPressColor;
+        if (button == &gameState->presetButtons[i]) {
+            gameState->presetButtons[i].box.color = interestIdleColor;
+            gameState->presetButtons[i].box.hoverColor = interestHoverColor;
+            gameState->presetButtons[i].box.pressColor = interestPressColor;
+            preset = (Preset)i;
+        }
+    }
+
+    gameState->activePreset = preset;
+    switch (preset) {
+        case PRESET_SPHERE: {
+            CreateParticleSystem(&gameState->ps,
+                MAX_PARTICLES, 500, 5.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                0.0f, 0.0f,
+                nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0,
+                InitParticleSphere, gameState->pTexSpark,
+                nullptr, nullptr);
+        } break;
+        case PRESET_FOUNTAIN_SINK: {
+            PlaneCollider groundPlane;
+            groundPlane.type = COLLIDER_SINK;
+            groundPlane.normal = Vec3::unitY;
+            groundPlane.point = Vec3::zero;
+            CreateParticleSystem(&gameState->ps,
+                10000, 1000, 10.0f, Vec3 { 0.0f, -1.0f, 0.0f },
+                0.1f, 0.05f,
+                nullptr, 0, &groundPlane, 1, nullptr, 0, nullptr, 0,
+                InitParticleFountain, gameState->pTexBase,
+                nullptr, nullptr);
+        } break;
+        case PRESET_FOUNTAIN_BOUNCE: {
+            PlaneCollider groundPlane;
+            groundPlane.type = COLLIDER_BOUNCE;
+            groundPlane.normal = Vec3::unitY;
+            groundPlane.point = Vec3::zero;
+            CreateParticleSystem(&gameState->ps,
+                1500, 1500, 10.0f, Vec3 { 0.0f, -1.0f, 0.0f },
+                0.1f, 0.05f,
+                nullptr, 0, &groundPlane, 1, nullptr, 0, nullptr, 0,
+                InitParticleFountain, gameState->pTexBase,
+                nullptr, nullptr);
+        } break;
+        case PRESET_BOX_COLLIDERS: {
+        } break;
+        case PRESET_SPHERE_COLLIDERS: {
+            SphereCollider spheres[3];
+            spheres[0].type = COLLIDER_BOUNCE;
+            spheres[0].center = { 0.2f, 0.2f, -2.0f };
+            spheres[0].radius = 1.1f;
+            spheres[1].type = COLLIDER_BOUNCE;
+            spheres[1].center = { -4.0f, -4.0f, 1.0f };
+            spheres[1].radius = 2.0f;
+            spheres[2].type = COLLIDER_SINK;
+            spheres[2].center = { 0.2f, 0.2f, 0.0f };
+            spheres[2].radius = 0.25f;
+            CreateParticleSystem(&gameState->ps,
+                MAX_PARTICLES, 500, 6.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                0.1f, 0.05f,
+                nullptr, 0, nullptr, 0, nullptr, 0, spheres, 3,
+                InitParticleSphereJet, gameState->pTexFire,
+                nullptr, nullptr);
+        } break;
+        case PRESET_ATTRACTORS: {
+            Attractor a[4];
+            a[0].pos = Vec3 { 2.0f, 4.0f, 0.0f };
+            a[0].strength = 2.5f;
+            a[1].pos = Vec3 { 1.0f, 0.0f, 1.0f };
+            a[1].strength = 1.0f;
+            a[2].pos = Vec3 { -5.0f, -1.0f, 0.0f };
+            a[2].strength = 4.0f;
+            a[3].pos = Vec3 { -5.0f, 5.0, -5.0f };
+            a[3].strength = 2.0f;
+            CreateParticleSystem(&gameState->ps,
+                10000, 1000, 10.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                0.2f, 0.2f,
+                a, 4, nullptr, 0, nullptr, 0, nullptr, 0,
+                InitParticleRandom, gameState->pTexBase,
+                nullptr, nullptr);
+        } break;
+        case PRESET_MESH: {
+            CreateParticleSystem(&gameState->ps,
+                MAX_PARTICLES, 1000, 2.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                0.1f, 0.05f,
+                nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0,
+                InitParticleMesh, gameState->pTexBase,
+                &gameState->loadedMesh, &gameState->loadedMeshGL);
+        } break;
+
+        case PRESET_LAST: {
+        } break;
+    }
+}
+
+internal void UpdatePresetLayout(GameState* gameState, ScreenInfo screenInfo)
+{
+    Vec2Int size = {
+        150, (int)gameState->fontFaceMedium.height + UI_SPACING
+    };
+    Vec2Int origin = {
+        screenInfo.size.x - UI_MARGIN - size.x,
+        UI_MARGIN
+    };
+    Vec2Int stride = {
+        0, size.y + UI_SPACING
+    };
+    for (int i = 0; i < PRESET_LAST; i++) {
+        gameState->presetButtons[i].box.origin = origin + stride * i;
+        gameState->presetButtons[i].box.size = size;
+        gameState->presetButtons[i].box.color = defaultIdleColor;
+        gameState->presetButtons[i].box.hoverColor = defaultHoverColor;
+        gameState->presetButtons[i].box.pressColor = defaultPressColor;
+    }
+    Preset activePreset = gameState->activePreset;
+    if (activePreset != PRESET_LAST) {
+        gameState->presetButtons[activePreset].box.color
+            = interestIdleColor;
+        gameState->presetButtons[activePreset].box.hoverColor
+            = interestHoverColor;
+        gameState->presetButtons[activePreset].box.pressColor
+            = interestPressColor;
+    }
+}
+
+internal void ToggleDrawColliders(Button* button, void* data)
+{
+    GameState* gameState = (GameState*)data;
+    gameState->drawColliders = !gameState->drawColliders;
+}
+
+internal bool32 IsFile(const ThreadContext* thread, const char* path,
+    DEBUGPlatformReadFileFunc DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc DEBUGPlatformFreeFileMemory)
+{
+    DEBUGReadFileResult objFile = DEBUGPlatformReadFile(thread, path);
+    if (!objFile.data) {
+        return false;
+    }
+    DEBUGPlatformFreeFileMemory(thread, &objFile);
+    return true;
+}
+
+internal void ChangeMesh(InputField* field, void* data)
+{
+    ChangeMeshData* cmData = (ChangeMeshData*)data;
+    GameState* gameState = cmData->gameState;
+
+    char meshPath[256];
+    sprintf(meshPath, "data/models/%s", field->text);
+    if (IsFile(cmData->thread, meshPath,
+    cmData->DEBUGPlatformReadFile, cmData->DEBUGPlatformFreeFileMemory)) {
+        FreeMesh(&gameState->loadedMesh);
+        FreeMeshGL(&gameState->loadedMeshGL);
+        gameState->loadedMesh = LoadMeshFromObj(cmData->thread,
+            meshPath,
+            cmData->DEBUGPlatformReadFile,
+            cmData->DEBUGPlatformFreeFileMemory);
+        gameState->loadedMeshGL = LoadMeshGL(cmData->thread,
+            gameState->loadedMesh,
+            cmData->DEBUGPlatformReadFile,
+            cmData->DEBUGPlatformFreeFileMemory);
+    }
 }
 
 extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
@@ -156,9 +420,6 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 		glClearDepth(1.0);
 		// Depth buffer transforms -1 to 1 range to 0 to 1 range
 		glDepthRange(0.0, 1.0);
-        // NOTE my scene doesn't need this, as long as I make sure to
-        // render everything in proper order
-        glDisable(GL_DEPTH_TEST);
 
 		glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -169,6 +430,8 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         gameState->cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
         gameState->modelRot = QuatFromAngleUnitAxis(PI_F / 6.0f, Vec3::unitX)
             * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
+
+        gameState->drawColliders = false;
 
         gameState->rectGL = InitRectGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
@@ -182,10 +445,21 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         gameState->textGL = InitTextGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->planeGL = InitPlaneGL(thread,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
         gameState->boxGL = InitBoxGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
         gameState->psGL = InitParticleSystemGL(thread,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->sphereMesh = LoadMeshFromObj(thread,
+            "data/models/sphere-2res.obj",
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->sphereMeshGL = LoadMeshGL(thread,
+            gameState->sphereMesh,
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
 
@@ -227,70 +501,62 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             platformFuncs->DEBUGPlatformReadFile,
             platformFuncs->DEBUGPlatformFreeFileMemory);
 
-        gameState->inputField = CreateInputField(
-            Vec2Int { UI_MARGIN, 500 }, Vec2Int { 200, 30 },
-            "Huh?", InputFieldCallbackTest,
-            defaultIdleColor,
-            defaultHoverColor,
-            defaultPressColor,
-            defaultTextColor
-        );
-        gameState->button = CreateButton(
-            Vec2Int { 500, UI_MARGIN }, Vec2Int { 200, 30 },
-            "Squish This", ButtonCallbackTest,
-            defaultIdleColor,
-            defaultHoverColor,
-            defaultPressColor,
+        gameState->activePreset = PRESET_SPHERE;
+        for (int i = 0; i < PRESET_LAST; i++) {
+            gameState->presetButtons[i] = CreateButton(
+                Vec2Int::zero, Vec2Int::zero,
+                presetNames_[i], PresetChange,
+                defaultIdleColor,
+                defaultHoverColor,
+                defaultPressColor,
+                defaultTextColor
+            );
+        }
+        UpdatePresetLayout(gameState, screenInfo);
+
+        Vec2Int drawCollidersOrigin = { UI_MARGIN, UI_MARGIN };
+        Vec2Int drawCollidersSize = {
+            150,
+            (int)gameState->fontFaceMedium.height + UI_SPACING
+        };
+        gameState->drawCollidersButton = CreateButton(
+            drawCollidersOrigin, drawCollidersSize,
+            "Draw Objects", ToggleDrawColliders,
+            interestIdleColor, interestHoverColor, interestPressColor,
             defaultTextColor
         );
 
-        // Attractor demo
-        // Attractor a[4];
-        // a[0].pos = Vec3 { 2.0f, 4.0f, 0.0f };
-        // a[0].strength = 2.5f;
-        // a[1].pos = Vec3 { 1.0f, 0.0f, 1.0f };
-        // a[1].strength = 1.0f;
-        // a[2].pos = Vec3 { -5.0f, -1.0f, 0.0f };
-        // a[2].strength = 4.0f;
-        // a[3].pos = Vec3 { -5.0f, 5.0, -5.0f };
-        // a[3].strength = 2.0f;
-        // CreateParticleSystem(&gameState->ps,
-        //     10000, 1000, 10.0f, Vec3 { 0.0f, 0.0f, 0.0f },
-        //     0.2f, 0.2f,
-        //     a, 4, nullptr, 0, nullptr, 0, nullptr, 0,
-        //     InitParticleRandom, gameState->pTexBase);
-        
-        // Sphere demo
-        // CreateParticleSystem(&gameState->ps,
-        //     MAX_PARTICLES, 500, 5.0f, Vec3 { 0.0f, 0.0f, 0.0f },
-        //     0.0f, 0.0f,
-        //     nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0,
-        //     InitParticleSphere, gameState->pTexSpark);
-        
-        // Fountain demo
-        // PlaneCollider groundPlane;
-        // groundPlane.type = COLLIDER_BOUNCE;
-        // groundPlane.normal = Vec3::unitY;
-        // groundPlane.point = Vec3::zero;
-        // CreateParticleSystem(&gameState->ps,
-        //     1500, 1500, 10.0f, Vec3 { 0.0f, -1.0f, 0.0f },
-        //     0.1f, 0.05f,
-        //     nullptr, 0, &groundPlane, 1, nullptr, 0, nullptr, 0,
-        //     InitParticleFountain, gameState->pTexBase);
+        Vec2Int modelFieldOrigin = {
+            drawCollidersOrigin.x,
+            drawCollidersOrigin.y + drawCollidersSize.y + UI_SPACING * 2
+        };
+        Vec2Int modelFieldSize = drawCollidersSize;
+        gameState->modelField = CreateInputField(
+            modelFieldOrigin, modelFieldSize,
+            defaultMesh_, ChangeMesh,
+            defaultIdleColor, defaultHoverColor, defaultPressColor,
+            defaultTextColor);
 
-        PlaneCollider groundPlane;
-        groundPlane.type = COLLIDER_BOUNCE;
-        groundPlane.normal = Vec3::unitY;
-        groundPlane.point = Vec3::zero;
-        AxisBoxCollider box;
-        box.type = COLLIDER_SINK;
-        box.min = { 0.25f, 0.25f, 0.25f };
-        box.max = { 1.25f, 1.25f, 1.25f };
-        CreateParticleSystem(&gameState->ps,
-            1500, 1500, 10.0f, Vec3 { 0.0f, -1.0f, 0.0f },
-            0.1f, 0.05f,
-            nullptr, 0, &groundPlane, 1, &box, 1, nullptr, 0,
-            InitParticleFountain, gameState->pTexBase);
+        ChangeMeshData cmData;
+        cmData.gameState = gameState;
+        cmData.thread = thread;
+        cmData.DEBUGPlatformReadFile = platformFuncs->DEBUGPlatformReadFile;
+        cmData.DEBUGPlatformFreeFileMemory =
+            platformFuncs->DEBUGPlatformFreeFileMemory;
+        ChangeMesh(&gameState->modelField, (void*)&cmData);
+        /*char meshPath[256];
+        sprintf(meshPath, "data/models/%s", defaultMesh_);
+        gameState->loadedMesh = LoadMeshFromObj(thread,
+            meshPath,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);
+        gameState->loadedMeshGL = LoadMeshGL(thread, gameState->loadedMesh,
+            platformFuncs->DEBUGPlatformReadFile,
+            platformFuncs->DEBUGPlatformFreeFileMemory);*/
+
+        // Initializes particle system
+        PresetChange(&gameState->presetButtons[gameState->activePreset],
+            (void*)gameState);
 
 		memory->isInitialized = true;
 	}
@@ -304,25 +570,50 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             * gameState->modelRot;
         gameState->modelRot = Normalize(gameState->modelRot);
     }
-    gameState->cameraPos.z = DEFAULT_CAM_Z
-        * powf(CAM_ZOOM_STEP, (float)input->mouseWheel);
-    if (WasKeyPressed(input, KM_KEY_ARROW_UP)) {
-        gameState->cameraPos.y += CAM_MOVE_STEP;
+
+    Vec3 forward = -Vec3::unitZ;
+    Vec3 right = Vec3::unitX;
+    if (input->keyboard[KM_KEY_ARROW_UP].isDown
+    || input->keyboard[KM_KEY_W].isDown) {
+        gameState->cameraPos += forward * deltaTime;
     }
-    if (WasKeyPressed(input, KM_KEY_ARROW_DOWN)) {
-        gameState->cameraPos.y -= CAM_MOVE_STEP;
+    if (input->keyboard[KM_KEY_ARROW_DOWN].isDown
+    || input->keyboard[KM_KEY_S].isDown) {
+        gameState->cameraPos -= forward * deltaTime;
     }
-    if (WasKeyPressed(input, KM_KEY_ARROW_LEFT)) {
-        gameState->cameraPos.x -= CAM_MOVE_STEP;
+    if (input->keyboard[KM_KEY_ARROW_RIGHT].isDown
+    || input->keyboard[KM_KEY_D].isDown) {
+        gameState->cameraPos += right * deltaTime;
     }
-    if (WasKeyPressed(input, KM_KEY_ARROW_RIGHT)) {
-        gameState->cameraPos.x += CAM_MOVE_STEP;
+    if (input->keyboard[KM_KEY_ARROW_LEFT].isDown
+    || input->keyboard[KM_KEY_A].isDown) {
+        gameState->cameraPos -= right * deltaTime;
     }
 
-    UpdateInputFields(&gameState->inputField, 1, input, (void*)gameState);
-    UpdateButtons(&gameState->button, 1, input, (void*)gameState);
+    UpdatePresetLayout(gameState, screenInfo);
+    UpdateButtons(gameState->presetButtons, PRESET_LAST,
+        input, (void*)gameState);
 
-    UpdateParticleSystem(&gameState->ps, deltaTime);
+    gameState->drawCollidersButton.box.color = defaultIdleColor;
+    gameState->drawCollidersButton.box.hoverColor = defaultHoverColor;
+    gameState->drawCollidersButton.box.pressColor = defaultPressColor;
+    if (gameState->drawColliders) {
+        gameState->drawCollidersButton.box.color = interestIdleColor;
+        gameState->drawCollidersButton.box.hoverColor = interestHoverColor;
+        gameState->drawCollidersButton.box.pressColor = interestPressColor;
+    }
+    UpdateButtons(&gameState->drawCollidersButton, 1,
+        input, (void*)gameState);
+    ChangeMeshData cmData;
+    cmData.gameState = gameState;
+    cmData.thread = thread;
+    cmData.DEBUGPlatformReadFile = platformFuncs->DEBUGPlatformReadFile;
+    cmData.DEBUGPlatformFreeFileMemory =
+        platformFuncs->DEBUGPlatformFreeFileMemory;
+    UpdateInputFields(&gameState->modelField, 1,
+        input, (void*)&cmData);
+
+    UpdateParticleSystem(&gameState->ps, deltaTime, nullptr);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -339,17 +630,19 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 #else
     const float DEBUG_AXES_COLOR_MAG = 0.5f;
 #endif
-    for (int i = 0; i < 3; i++) {
-        Vec3 endPoint = Vec3::zero;
-        endPoint.e[i] = DEBUG_AXES_HALF_LENGTH;
-        Vec4 axisColor = Vec4::zero;
-        axisColor.a = 1.0f;
-        axisColor.e[i] = DEBUG_AXES_COLOR_MAG;
-        DrawLine(gameState->lineGL, proj, view,
-            Vec3::zero, endPoint, axisColor);
-        axisColor.e[i] *= 0.5f;
-        DrawLine(gameState->lineGL, proj, view,
-            -endPoint, Vec3::zero, axisColor);
+    if (gameState->drawColliders) {
+        for (int i = 0; i < 3; i++) {
+            Vec3 endPoint = Vec3::zero;
+            endPoint.e[i] = DEBUG_AXES_HALF_LENGTH;
+            Vec4 axisColor = Vec4::zero;
+            axisColor.a = 1.0f;
+            axisColor.e[i] = DEBUG_AXES_COLOR_MAG;
+            DrawLine(gameState->lineGL, proj, view,
+                Vec3::zero, endPoint, axisColor);
+            axisColor.e[i] *= 0.5f;
+            DrawLine(gameState->lineGL, proj, view,
+                -endPoint, Vec3::zero, axisColor);
+        }
     }
     // NOTE this one draw call doesn't work...
     // DrawLine(gameState->lineGL, proj, view,
@@ -360,16 +653,19 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     //     -Vec3::unitX * DEBUG_AXES_HALF_LENGTH, Vec3::zero,
     //     Vec4 { 0.5f, 0.0f, 0.0f, 1.0f });
 
-    // Get camera right and up vectors for billboard draw
     DEBUG_ASSERT(sizeof(ParticleSystemDataGL) <= memory->transientStorageSize);
     ParticleSystemDataGL* dataGL = (ParticleSystemDataGL*)
         memory->transientStorage;
+    // Get camera right and up vectors for billboard draw
     Vec3 camRight = { view.e[0][0], view.e[1][0], view.e[2][0] };
     Vec3 camUp = { view.e[0][1], view.e[1][1], view.e[2][1] };
-    DrawParticleSystem(gameState->psGL, gameState->boxGL,
+    Vec3 camOut = { view.e[0][2], view.e[1][2], view.e[2][2] };
+    DrawParticleSystem(gameState->psGL,
+        gameState->planeGL, gameState->boxGL, gameState->sphereMeshGL,
         &gameState->ps,
-        camRight, camUp, gameState->cameraPos, vp,
-        dataGL);
+        camRight, camUp, gameState->cameraPos, proj, view,
+        dataGL,
+        gameState->drawColliders);
 
     // Assignment title & name
     DrawText(gameState->textGL, gameState->fontFaceLarge, screenInfo,
@@ -413,17 +709,26 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         interestTextColor
     );
 
-    DrawInputFields(&gameState->inputField, 1,
+    DrawButtons(gameState->presetButtons, PRESET_LAST,
         gameState->rectGL, gameState->textGL,
         gameState->fontFaceMedium, screenInfo);
-    DrawButtons(&gameState->button, 1,
+    DrawButtons(&gameState->drawCollidersButton, 1,
+        gameState->rectGL, gameState->textGL,
+        gameState->fontFaceMedium, screenInfo);
+    Vec2Int modelFieldTextPos = gameState->modelField.box.origin;
+    modelFieldTextPos.y += gameState->modelField.box.size.y + UI_SPACING;
+    DrawText(gameState->textGL, gameState->fontFaceMedium, screenInfo,
+        "Loaded Model:", modelFieldTextPos, defaultTextColor);
+    DrawInputFields(&gameState->modelField, 1,
         gameState->rectGL, gameState->textGL,
         gameState->fontFaceMedium, screenInfo);
 }
 
 #include "km_input.cpp"
+#include "km_lib.cpp"
 #include "ogl_base.cpp"
 #include "text.cpp"
 #include "gui.cpp"
 #include "load_png.cpp"
 #include "particles.cpp"
+#include "mesh.cpp"

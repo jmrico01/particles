@@ -851,7 +851,6 @@ Quat QuatRotBetweenVectors(Vec3 v1, Vec3 v2)
     if (axis == Vec3::zero) {
         return Quat::one;
     }
-
     return QuatFromAngleUnitAxis(angle, Normalize(axis));
 }
 

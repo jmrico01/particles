@@ -79,5 +79,7 @@ void DrawTexturedRect(TexturedRectGL texturedRectGL, ScreenInfo screenInfo,
     Vec2Int pos, Vec2 anchor, Vec2Int size, GLuint texture);
 void DrawLine(LineGL lineGL,
     Mat4 proj, Mat4 view, Vec3 v1, Vec3 v2, Vec4 color);
+void DrawPlane(PlaneGL,
+    Mat4 vp, Vec3 point, Vec3 normal, Vec4 color);
 void DrawBox(BoxGL boxGL,
-    Mat4 mvp, Vec3 min, Vec3 max, Vec4 color);
+    Mat4 vp, Vec3 min, Vec3 max, Vec4 color);

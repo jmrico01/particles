@@ -119,7 +119,8 @@ void CreateParticleSystem(ParticleSystem* ps, int maxParticles,
     PlaneCollider* planeColliders, int numPlaneColliders,
     AxisBoxCollider* boxColliders, int numBoxColliders,
     SphereCollider* sphereColliders, int numSphereColliders,
-    InitParticleFunction initParticleFunc, GLuint texture)
+    InitParticleFunction initParticleFunc, GLuint texture,
+    Mesh* mesh, MeshGL* meshGL)
 {
     DEBUG_ASSERT(0 <= maxParticles && maxParticles <= MAX_PARTICLES);
 
@@ -161,9 +162,12 @@ void CreateParticleSystem(ParticleSystem* ps, int maxParticles,
     ps->initParticleFunc = initParticleFunc;
 
     ps->texture = texture;
+
+    ps->mesh = mesh;
+    ps->meshGL = meshGL;
 }
 
-void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime)
+void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data)
 {
     // Update all particles
     for (int i = 0; i < ps->active; i++) {
@@ -236,6 +240,44 @@ void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime)
                 }
             }
         }
+        // Sphere colliders
+        for (int c = 0; c < ps->numSphereColliders; c++) {
+            // From Assignment 3, sphere & ray collision
+            Vec3 pos = ps->particles[i].pos;
+            Vec3 dir = ps->particles[i].vel * deltaTime;
+            Vec3 center = ps->sphereColliders[c].center;
+            float32 radius = ps->sphereColliders[c].radius;
+
+            Vec3 toSphere = center - pos;
+            float32 tClosest = Dot(toSphere, dir);
+            Vec3 closest = pos + dir * tClosest;
+            float32 dist = Mag(closest - center);
+            if (dist > radius) {
+                continue;
+            }
+
+            switch (ps->sphereColliders[c].type) {
+                case COLLIDER_SINK: {
+                    ps->particles[i].life = ps->maxLife + PARTICLE_EPS;
+                } break;
+                case COLLIDER_BOUNCE: {
+                    float32 tOffset = sqrtf(radius * radius - dist * dist);
+                    float32 tInt = tClosest - tOffset;
+                    if (tInt < PARTICLE_EPS) {
+                        tInt = tClosest + tOffset;
+                        if (tInt < PARTICLE_EPS) {
+                            continue;
+                        }
+                    }
+                    Vec3 intersect = pos + dir * tInt;
+                    Vec3 normal = Normalize(intersect - center);
+                    Vec3 velReflect = Dot(normal, ps->particles[i].vel)
+                        * normal;
+                    ps->particles[i].vel -= velReflect * 2.0f;
+                    ps->particles[i].pos = intersect + normal * Mag(dir);
+                } break;
+            }
+        }
 
         // Position update
         ps->particles[i].pos += ps->particles[i].vel * deltaTime;
@@ -275,7 +317,7 @@ void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime)
     }
     for (int i = 0; i < spawn; i++) {
         int ind = ps->active;
-        ps->initParticleFunc(ps, &ps->particles[ind]);
+        ps->initParticleFunc(ps, &ps->particles[ind], data);
         ps->active++;
     }
 }
@@ -295,11 +337,15 @@ internal int DepthComparator(const void* p, const void* q)
     }
 }
 
-void DrawParticleSystem(ParticleSystemGL psGL, BoxGL boxGL,
+void DrawParticleSystem(ParticleSystemGL psGL,
+    PlaneGL planeGL, BoxGL boxGL, MeshGL sphereMeshGL,
     ParticleSystem* ps,
-    Vec3 camRight, Vec3 camUp, Vec3 camPos, Mat4 vp,
-    ParticleSystemDataGL* dataGL)
+    Vec3 camRight, Vec3 camUp, Vec3 camPos, Mat4 proj, Mat4 view,
+    ParticleSystemDataGL* dataGL,
+    bool32 drawColliders)
 {
+    Mat4 vp = proj * view;
+
     int active = (int)ps->active;
     for (int i = 0; i < active; i++) {
         Vec4 transformed = vp * ToVec4(ps->particles[i].pos, 1.0f);
@@ -353,9 +399,28 @@ void DrawParticleSystem(ParticleSystemGL psGL, BoxGL boxGL,
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, active);
     glBindVertexArray(0);
 
-    for (int i = 0; i < ps->numBoxColliders; i++) {
-        DrawBox(boxGL, vp,
-            ps->boxColliders[i].min, ps->boxColliders[i].max,
-            Vec4 { 0.4f, 0.0f, 0.4f, 0.2f });
+    if (drawColliders) {
+        glDisable(GL_DEPTH_TEST);
+        Vec4 colliderColor = { 0.4f, 0.4f, 0.4f, 0.3f };
+        for (int i = 0; i < ps->numPlaneColliders; i++) {
+            DrawPlane(planeGL, vp,
+                ps->planeColliders[i].point, ps->planeColliders[i].normal,
+                colliderColor);
+        }
+        for (int i = 0; i < ps->numBoxColliders; i++) {
+            DrawBox(boxGL, vp,
+                ps->boxColliders[i].min, ps->boxColliders[i].max,
+                colliderColor);
+        }
+        for (int i = 0; i < ps->numSphereColliders; i++) {
+            Mat4 viewModel = view * Translate(ps->sphereColliders[i].center)
+                * Scale(ps->sphereColliders[i].radius);
+            DrawMeshGL(sphereMeshGL, proj, viewModel, colliderColor);
+        }
+        if (ps->meshGL != nullptr) {
+            DrawMeshGL(*ps->meshGL, proj, view,
+                Vec4 { 0.0f, 1.0f, 1.0f, 0.2f });
+            glEnable(GL_DEPTH_TEST);
+        }
     }
 }

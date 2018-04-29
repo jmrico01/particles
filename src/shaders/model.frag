@@ -1,9 +1,10 @@
 #version 330 core
 
 in vec3 normalCamSpace;
-in vec3 vertColor;
 
 out vec4 outColor;
+
+uniform vec4 color;
 
 void main()
 {
@@ -15,5 +16,5 @@ void main()
     float cosTheta = dot(normalCamSpace, -lightDirCamSpace);
 
     vec3 lightingTotal = ambientColor + lightColor * cosTheta;
-    outColor = vec4(lightingTotal * vertColor, 1.0);
+    outColor = vec4(lightingTotal, 1.0) * color;
 }

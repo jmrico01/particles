@@ -219,6 +219,7 @@ typedef ptrdiff_t   GLintptr;
 	FUNC(void,	glEnableVertexAttribArray, GLuint index) \
 	FUNC(void,	glVertexAttribPointer, GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* pointer) \
     FUNC(void,  glVertexAttribDivisor, GLuint index, GLuint divisor) \
+    FUNC(void,  glDeleteBuffers, GLsizei n, const GLuint* buffers) \
 \
 	FUNC(void,	glUseProgram, GLuint program) \
 	FUNC(GLint,	glGetUniformLocation, GLuint program, const GLchar* name) \

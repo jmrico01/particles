@@ -4,6 +4,7 @@
 #include "opengl.h"
 #include "ogl_base.h"
 #include "main_platform.h"
+#include "mesh.h"
 
 #define MAX_PARTICLES 100000
 #define MAX_SPAWN (MAX_PARTICLES / 10)
@@ -57,7 +58,7 @@ struct SphereCollider
 };
 
 struct ParticleSystem;
-typedef void (*InitParticleFunction)(ParticleSystem*, Particle*);
+typedef void (*InitParticleFunction)(ParticleSystem*, Particle*, void* data);
 
 struct ParticleSystem
 {
@@ -87,6 +88,9 @@ struct ParticleSystem
     InitParticleFunction initParticleFunc;
 
     GLuint texture;
+
+    Mesh* mesh;
+    MeshGL* meshGL;
 };
 
 struct ParticleSystemGL
@@ -118,9 +122,12 @@ void CreateParticleSystem(ParticleSystem* ps, int maxParticles,
     PlaneCollider* planeColliders, int numPlaneColliders,
     AxisBoxCollider* boxColliders, int numBoxColliders,
     SphereCollider* sphereColliders, int numSphereColliders,
-    InitParticleFunction initParticleFunc, GLuint texture);
-void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime);
-void DrawParticleSystem(ParticleSystemGL psGL, BoxGL boxGL,
+    InitParticleFunction initParticleFunc, GLuint texture,
+    Mesh* mesh, MeshGL* meshGL);
+void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data);
+void DrawParticleSystem(ParticleSystemGL psGL,
+    PlaneGL planeGL, BoxGL boxGL, MeshGL sphereMeshGL,
     ParticleSystem* ps,
-    Vec3 camRight, Vec3 camUp, Vec3 camPos, Mat4 vp,
-    ParticleSystemDataGL* dataGL);
+    Vec3 camRight, Vec3 camUp, Vec3 camPos, Mat4 proj, Mat4 view,
+    ParticleSystemDataGL* dataGL,
+    bool32 drawColliders);

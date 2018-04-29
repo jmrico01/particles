@@ -1,14 +1,12 @@
 #version 330 core
 
-layout(location = 0) in vec2 position;
+#define PLANE_SIZE 50.0f
 
-uniform vec3 posBottomLeft;
-uniform vec2 size;
+layout(location = 0) in vec3 position;
+
+uniform mat4 mvp;
 
 void main()
 {
-    gl_Position = vec4(
-        position.xy * size + posBottomLeft.xy,
-        posBottomLeft.z,
-        1.0);
+    gl_Position = mvp * vec4(position * PLANE_SIZE, 1.0);
 }
