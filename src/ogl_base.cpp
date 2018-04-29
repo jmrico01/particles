@@ -284,6 +284,121 @@ LineGL InitLineGL(const ThreadContext* thread,
     return lineGL;
 }
 
+PlaneGL InitPlaneGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
+{
+    PlaneGL planeGL;
+    const GLfloat vertices[] = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &planeGL.vertexArray);
+    glBindVertexArray(planeGL.vertexArray);
+
+    glGenBuffers(1, &planeGL.vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, planeGL.vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
+        GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        0, // match shader layout location
+        3, // size (vec3)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
+    glBindVertexArray(0);
+
+    planeGL.programID = LoadShaders(thread,
+        "shaders/plane.vert", "shaders/plane.frag",
+        DEBUGPlatformReadFile, DEBUGPlatformFreeFileMemory);
+    
+    return planeGL;
+}
+
+BoxGL InitBoxGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
+{
+    BoxGL boxGL;
+    const GLfloat vertices[] = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f,
+
+        0.0f, 0.0f, 1.0f,
+        0.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 1.0f,
+
+        1.0f, 0.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 1.0f,
+
+        0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f,
+        0.0f, 1.0f, 1.0f,
+        0.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 0.0f,
+
+        0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f,
+
+        0.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        0.0f, 1.0f, 1.0f,
+        0.0f, 1.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &boxGL.vertexArray);
+    glBindVertexArray(boxGL.vertexArray);
+
+    glGenBuffers(1, &boxGL.vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, boxGL.vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
+        GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        0, // match shader layout location
+        3, // size (vec3)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
+    glBindVertexArray(0);
+
+    boxGL.programID = LoadShaders(thread,
+        "shaders/box.vert", "shaders/box.frag",
+        DEBUGPlatformReadFile, DEBUGPlatformFreeFileMemory);
+    
+    return boxGL;
+}
+
 void DrawRect(RectGL rectGL, ScreenInfo screenInfo,
     Vec2Int pos, Vec2 anchor, Vec2Int size, Vec4 color)
 {
@@ -345,5 +460,25 @@ void DrawLine(LineGL lineGL,
 
     glBindVertexArray(lineGL.vertexArray);
     glDrawArrays(GL_LINES, 0, 2);
+    glBindVertexArray(0);
+}
+
+void DrawBox(BoxGL boxGL,
+    Mat4 mvp, Vec3 min, Vec3 max, Vec4 color)
+{
+    GLint loc;
+    glUseProgram(boxGL.programID);
+
+    loc = glGetUniformLocation(boxGL.programID, "min");
+    glUniform3fv(loc, 1, &min.e[0]);
+    loc = glGetUniformLocation(boxGL.programID, "max");
+    glUniform3fv(loc, 1, &max.e[0]);
+    loc = glGetUniformLocation(boxGL.programID, "mvp");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);
+    loc = glGetUniformLocation(boxGL.programID, "color");
+    glUniform4fv(loc, 1, &color.e[0]);
+
+    glBindVertexArray(boxGL.vertexArray);
+    glDrawArrays(GL_TRIANGLES, 0, 48);
     glBindVertexArray(0);
 }

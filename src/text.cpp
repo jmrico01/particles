@@ -252,7 +252,6 @@ void DrawText(TextGL textGL, const FontFace& face, ScreenInfo screenInfo,
     // TODO should I be doing this here?
     // or should I do it globally for TEXTURE0 somewhere,
     // and designate TEXTURE0 as GL_TEXTURE_2D
-    glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, face.atlasTexture);
     loc = glGetUniformLocation(textGL.programID, "textureSampler");
     glUniform1i(loc, 0);

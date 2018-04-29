@@ -15,6 +15,7 @@ struct GameState
     TexturedRectGL texturedRectGL;
     LineGL lineGL;
     TextGL textGL;
+    BoxGL boxGL;
     ParticleSystemGL psGL;
 
     FT_Library ftLibrary;
@@ -22,9 +23,13 @@ struct GameState
     FontFace fontFaceMedium;
     FontFace fontFaceLarge;
 
-    ParticleSystem ps;
-
-    GLuint textureID;
+    GLuint pTexBase;
+    GLuint pTexFire;
+    GLuint pTexSmoke;
+    GLuint pTexSpark;
+    GLuint pTexSphere;
     InputField inputField;
     Button button;
+
+    ParticleSystem ps;
 };

@@ -969,7 +969,7 @@ int CALLBACK WinMain(
     gameMemory.DEBUGShouldInitGlobalFuncs = true;
 
     gameMemory.permanentStorageSize = MEGABYTES(64);
-    gameMemory.transientStorageSize = MEGABYTES(1);
+    gameMemory.transientStorageSize = MEGABYTES(64);
 
     // TODO Look into using large virtual pages for this
     // potentially big allocation

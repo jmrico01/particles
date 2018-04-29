@@ -26,6 +26,20 @@ struct LineGL
     GLuint programID;
 };
 
+struct PlaneGL
+{
+    GLuint vertexArray;
+    GLuint vertexBuffer;
+    GLuint programID;
+};
+
+struct BoxGL
+{
+    GLuint vertexArray;
+    GLuint vertexBuffer;
+    GLuint programID;
+};
+
 struct RectCoordsNDC
 {
     Vec3 pos;
@@ -51,6 +65,12 @@ TexturedRectGL InitTexturedRectGL(const ThreadContext* thread,
 LineGL InitLineGL(const ThreadContext* thread,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
     DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
+PlaneGL InitPlaneGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
+BoxGL InitBoxGL(const ThreadContext* thread,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
 
 // TODO this API is unrealistic and dumb. I need a batch draw function
 void DrawRect(RectGL rectGL, ScreenInfo screenInfo,
@@ -59,3 +79,5 @@ void DrawTexturedRect(TexturedRectGL texturedRectGL, ScreenInfo screenInfo,
     Vec2Int pos, Vec2 anchor, Vec2Int size, GLuint texture);
 void DrawLine(LineGL lineGL,
     Mat4 proj, Mat4 view, Vec3 v1, Vec3 v2, Vec4 color);
+void DrawBox(BoxGL boxGL,
+    Mat4 mvp, Vec3 min, Vec3 max, Vec4 color);
