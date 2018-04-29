@@ -995,22 +995,23 @@ int main(int argc, char **argv)
             glWindow, wmDeleteWindow,
             newInput, &mousePos, &screenInfo);
 
+        flipWallClock = LinuxGetWallClock();
+
+        struct timespec endCounter = LinuxGetWallClock();
+        float32 elapsed = LinuxGetSecondsElapsed(
+            lastCounter, endCounter);
+        //DEBUG_PRINT("secs per frame: %f\n", measuredSecondsPerFrame);
+        lastCounter = endCounter;
+
         if (gameCode.gameUpdateAndRender) {
 			ThreadContext thread = {};
             gameCode.gameUpdateAndRender(&thread, &platformFuncs,
                 newInput, screenInfo,
+                elapsed,
                 &gameMemory);
         }
         
         glXSwapBuffers(display, glWindow);
-
-        flipWallClock = LinuxGetWallClock();
-
-        struct timespec endCounter = LinuxGetWallClock();
-        //float32 measuredSecondsPerFrame = LinuxGetSecondsElapsed(
-        //    lastCounter, endCounter);
-        //DEBUG_PRINT("secs per frame: %f\n", measuredSecondsPerFrame);
-        lastCounter = endCounter;
 
 		GameInput *temp = newInput;
 		newInput = oldInput;
