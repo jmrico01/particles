@@ -412,6 +412,7 @@ void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data)
                     } break;
                     case COLLIDER_BOUNCE: {
                         Vec3 intersect = pos + dir * tIntMin;
+                        normal *= 1.1f;
                         HandleBounceCollision(&ps->particles[i],
                             intersect, normal, deltaTime, BOUNCE_MARGIN);
                     } break;

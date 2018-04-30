@@ -88,7 +88,7 @@ Implemented in the colliders section of <i>UpdateParticleSystem in particles.cpp
 
 <p>HandleBounceCollision splits the velocity into normal and tangent components. I scale the velocity's normal component by "bounceMult" and its tangent component by "frictionMult", both of which are per-particle parameters. I set the position to the intersection point, offset by a small value along the intersection normal.
 
-<p>NOTE: I tested this on my roommate's computer, as I usually do. Ocasionally, the framerate dropped for a couple of frames, and the particles fell through the plane. This is hard to test, however, and I wasn't able to replicate it.
+<p>NOTE: I changed a value of bounce tolerance last minute, and now the particles are tunneling through the plane once they are near 0 velocity. This could be fixed easily by tweaking this tolerance, but I don't want to break any other collision system.
 
 <p>
 <img src='results/plane1.png'/>
