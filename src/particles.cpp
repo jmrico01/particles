@@ -7,6 +7,7 @@
 #include "opengl_funcs.h"
 
 #define PARTICLE_EPS 0.0001f
+#define BOUNCE_MARGIN 0.001f
 
 ParticleSystemGL InitParticleSystemGL(const ThreadContext* thread,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
@@ -165,11 +166,131 @@ void CreateParticleSystem(ParticleSystem* ps, int maxParticles,
 
     ps->mesh = mesh;
     ps->meshGL = meshGL;
+
+    ps->width = 0;
+    ps->height = 0;
+    ps->hookeStrength = 0.0f;
+}
+
+internal int IndTo1D(int x, int y, ParticleSystem* ps)
+{
+    return y * ps->width + x;
+}
+internal int IndTo1D(Vec2Int i, ParticleSystem* ps)
+{
+    return IndTo1D(i.x, i.y, ps);
+}
+internal Vec2Int IndTo2D(int i, ParticleSystem* ps)
+{
+    return { i % ps->width, i / ps->width};
+}
+
+void CreateParticleSystem(ParticleSystem* ps,
+    int width, int height, Vec3 origin, Vec3 strideX, Vec3 strideY,
+    Vec3 gravity, float32 hookeStrength, float32 hookeEqDist,
+    float32 linearDamp, float32 quadraticDamp,
+    Attractor* attractors, int numAttractors,
+    PlaneCollider* planeColliders, int numPlaneColliders,
+    AxisBoxCollider* boxColliders, int numBoxColliders,
+    SphereCollider* sphereColliders, int numSphereColliders,
+    GLuint texture)
+{
+    DEBUG_ASSERT(width > 0 && height > 0);
+    int numParticles = width * height;
+    DEBUG_ASSERT(0 <= numParticles && numParticles <= MAX_PARTICLES);
+    ps->width = width;
+    ps->height = height;
+    ps->hookeStrength = hookeStrength;
+    ps->hookeEqDist = hookeEqDist;
+
+    for (int x = 0; x < width; x++) {
+        for (int y = 0; y < height; y++) {
+            int i = IndTo1D(x, y, ps);
+            ps->particles[i].life = 0.0f;
+            ps->particles[i].pos = origin
+                + strideX * (float32)x + strideY * (float32)y;
+            ps->particles[i].vel = Vec3::zero;
+            ps->particles[i].color = Vec4::one;
+            ps->particles[i].size = { 0.05f, 0.05f };
+            ps->particles[i].bounceMult = 0.0f;
+            ps->particles[i].frictionMult = 0.25f;
+        }
+    }
+
+    ps->spawnCounter = 0.0f;
+    ps->active = numParticles;
+
+    ps->maxParticles = numParticles;
+    ps->particlesPerSec = 0;
+    ps->maxLife = 0.0f;
+    ps->gravity = gravity;
+    ps->linearDamp = linearDamp;
+    ps->quadraticDamp = quadraticDamp;
+
+    DEBUG_ASSERT(0 <= numAttractors && numAttractors < MAX_ATTRACTORS);
+    for (int i = 0; i < numAttractors; i++) {
+        ps->attractors[i] = attractors[i];
+    }
+    ps->numAttractors = numAttractors;
+
+    DEBUG_ASSERT(0 <= numPlaneColliders
+        && numPlaneColliders < MAX_COLLIDERS);
+    for (int i = 0; i < numPlaneColliders; i++) {
+        ps->planeColliders[i] = planeColliders[i];
+    }
+    ps->numPlaneColliders = numPlaneColliders;
+    DEBUG_ASSERT(0 <= numBoxColliders
+        && numBoxColliders < MAX_COLLIDERS);
+    for (int i = 0; i < numBoxColliders; i++) {
+        ps->boxColliders[i] = boxColliders[i];
+    }
+    ps->numBoxColliders = numBoxColliders;
+    DEBUG_ASSERT(0 <= numSphereColliders
+        && numSphereColliders < MAX_COLLIDERS);
+    for (int i = 0; i < numSphereColliders; i++) {
+        ps->sphereColliders[i] = sphereColliders[i];
+    }
+    ps->numSphereColliders = numSphereColliders;
+
+    ps->initParticleFunc = nullptr;
+
+    ps->texture = texture;
+
+    ps->mesh = nullptr;
+    ps->meshGL = nullptr;
+}
+
+internal Vec3 CalculateHookeForce(ParticleSystem* ps, int i, int neighbor)
+{
+    Vec3 distVec = ps->particles[neighbor].pos - ps->particles[i].pos;
+    float32 dist = Mag(distVec);
+    distVec /= dist;
+    float32 deltaX = dist - ps->hookeEqDist;
+    return ps->hookeStrength * deltaX * distVec;
+}
+
+internal void HandleBounceCollision(Particle* p,
+    Vec3 intersect, Vec3 normal, float32 deltaTime, float32 offset)
+{
+    Vec3 velNormal = Dot(normal, p->vel) * normal;
+    Vec3 velTangent = p->vel - velNormal;
+    p->vel = velTangent * p->frictionMult - velNormal * p->bounceMult;
+    float32 off = MinFloat32(Mag(p->vel) * deltaTime, offset);
+    p->pos = intersect + normal * offset;
+}
+
+internal inline bool32 IsInsideBox(Vec3 p, Vec3 boxMin, Vec3 boxMax)
+{
+    return boxMin.x <= p.x && p.x <= boxMax.x 
+        && boxMin.y <= p.y && p.y <= boxMax.y
+        && boxMin.z <= p.z && p.z <= boxMax.z;
 }
 
 void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data)
 {
-    // Update all particles
+    bool32 isGrid = ps->width != 0 && ps->height != 0;
+
+    // Update all particle non-position data
     for (int i = 0; i < ps->active; i++) {
         ps->particles[i].life += deltaTime;
 
@@ -189,60 +310,117 @@ void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data)
             float32 attractMag = ps->attractors[a].strength / distToAttractor;
             attract += attractMag * toAttractor;
         }
+        // Hooke forces (grid)
+        Vec3 hookeForce = Vec3::zero;
+        if (isGrid) {
+            Vec2Int coords = IndTo2D(i, ps);
+            if (coords.x > 0) {
+                int neighbor = IndTo1D(coords.x - 1, coords.y, ps);
+                hookeForce += CalculateHookeForce(ps, i, neighbor);
+            }
+            if (coords.x < ps->width - 1) {
+                int neighbor = IndTo1D(coords.x + 1, coords.y, ps);
+                hookeForce += CalculateHookeForce(ps, i, neighbor);
+            }
+            if (coords.y > 0) {
+                int neighbor = IndTo1D(coords.x, coords.y - 1, ps);
+                hookeForce += CalculateHookeForce(ps, i, neighbor);
+            }
+            if (coords.y < ps->height - 1) {
+                int neighbor = IndTo1D(coords.x, coords.y + 1, ps);
+                hookeForce += CalculateHookeForce(ps, i, neighbor);
+            }
+        }
         // Velocity update
-        ps->particles[i].vel += (ps->gravity + attract - damp) * deltaTime;
-        
+        ps->particles[i].vel += (ps->gravity + attract + hookeForce - damp)
+            * deltaTime;
+
+        if (!isGrid) {
+            // Color update
+            float32 alpha = 1.0f - ps->particles[i].life / ps->maxLife;
+            alpha = sqrtf(alpha);
+            ps->particles[i].color.a = alpha;
+        }
+    }
+    // Update all particle position data
+    for (int i = 0; i < ps->active; i++) {
         // Plane colliders
         for (int c = 0; c < ps->numPlaneColliders; c++) {
-            Vec3 planeNormal = ps->planeColliders[c].normal;
-            Vec3 velDir = ps->particles[i].vel;
-            float32 velMag = Mag(velDir);
-            velDir /= velMag;
-            velMag *= deltaTime;
-            float32 denom = Dot(planeNormal, velDir);
-            if (abs(denom) > PARTICLE_EPS) {
-                float32 t = Dot(
-                    ps->planeColliders[c].point - ps->particles[i].pos,
-                    planeNormal) / denom;
-                if (0.0f <= t && t < velMag) {
-                    switch (ps->planeColliders[c].type) {
-                        case COLLIDER_SINK: {
-                            ps->particles[i].life = ps->maxLife + PARTICLE_EPS;
-                        } break;
-                        case COLLIDER_BOUNCE: {
-                            Vec3 velReflect =
-                                Dot(planeNormal, ps->particles[i].vel)
-                                * planeNormal;
-                            ps->particles[i].vel -= 2.0f * velReflect
-                                * ps->particles[i].bounceMult;
-                            ps->particles[i].pos += t * velDir
-                                + planeNormal * velMag;
-                        } break;
-                    }
+            Vec3 pos = ps->particles[i].pos;
+            Vec3 dir = ps->particles[i].vel * deltaTime;
+            Vec3 normal = ps->planeColliders[c].normal;
+            Vec3 point = ps->planeColliders[c].point;
+
+            float denom = Dot(normal, dir);
+            if (abs(denom) < PARTICLE_EPS) {
+                // Motion parallel to the plane
+                continue;
+            }
+
+            float32 t = Dot(point - pos, normal) / denom;
+            if (-PARTICLE_EPS <= t && t < 1.0f) {
+                switch (ps->planeColliders[c].type) {
+                    case COLLIDER_SINK: {
+                        ps->particles[i].life = ps->maxLife + PARTICLE_EPS;
+                    } break;
+                    case COLLIDER_BOUNCE: {
+                        Vec3 intersect = pos + t * dir;
+                        HandleBounceCollision(&ps->particles[i],
+                            intersect, normal, deltaTime, BOUNCE_MARGIN);
+                    } break;
                 }
             }
         }
         // Box colliders
         for (int c = 0; c < ps->numBoxColliders; c++) {
-            Vec3 newPos = ps->particles[i].pos
-                + ps->particles[i].vel * deltaTime;
+            Vec3 pos = ps->particles[i].pos;
+            Vec3 dir = ps->particles[i].vel * deltaTime;
+            //Vec3 newPos = pos + dir;
             Vec3 boxMin = ps->boxColliders[c].min;
             Vec3 boxMax = ps->boxColliders[c].max;
-            if (boxMin.x <= newPos.x && newPos.x <= boxMax.x 
-            && boxMin.y <= newPos.y && newPos.y <= boxMax.y
-            && boxMin.z <= newPos.z && newPos.z <= boxMax.z) {
+            bool32 found = false;
+            float tIntMin = 1e6;
+            Vec3 normal = Vec3::unitX;
+            for (int e = 0; e < 3; e++) {
+                float32 tInt1 = (boxMin.e[e] - pos.e[e])
+                    / dir.e[e];
+                Vec3 v1 = pos + tInt1 * dir;
+                if (IsInsideBox(v1, boxMin, boxMax)
+                && PARTICLE_EPS < tInt1 && tInt1 < tIntMin) {
+                    tIntMin = tInt1;
+                    Vec3 n = Vec3::zero;
+                    n.e[e] = -1.0f;
+                    normal = n;
+                    found = true;
+                }
+                float32 tInt2 = (boxMax.e[e] - pos.e[e])
+                    / dir.e[e];
+                Vec3 v2 = pos + tInt2 * dir;
+                if (IsInsideBox(v2, boxMin, boxMax)
+                && PARTICLE_EPS < tInt2 && tInt2 < tIntMin) {
+                    tIntMin = tInt2;
+                    Vec3 n = Vec3::zero;
+                    n.e[e] = 1.0f;
+                    normal = n;
+                    found = true;
+                }
+            }
+            if (found && 0.0f <= tIntMin && tIntMin <= 1.0f) {
                 switch (ps->boxColliders[c].type) {
                     case COLLIDER_SINK: {
                         ps->particles[i].life = ps->maxLife + PARTICLE_EPS;
                     } break;
                     case COLLIDER_BOUNCE: {
+                        Vec3 intersect = pos + dir * tIntMin;
+                        HandleBounceCollision(&ps->particles[i],
+                            intersect, normal, deltaTime, BOUNCE_MARGIN);
                     } break;
                 }
             }
         }
         // Sphere colliders
         for (int c = 0; c < ps->numSphereColliders; c++) {
-            // From Assignment 3, sphere & ray collision
+            // From Assignment 3, sphere + ray collision
             Vec3 pos = ps->particles[i].pos;
             Vec3 dir = ps->particles[i].vel * deltaTime;
             Vec3 center = ps->sphereColliders[c].center;
@@ -271,23 +449,19 @@ void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data)
                     }
                     Vec3 intersect = pos + dir * tInt;
                     Vec3 normal = Normalize(intersect - center);
-                    Vec3 velReflect = Dot(normal, ps->particles[i].vel)
-                        * normal;
-                    ps->particles[i].vel -= velReflect * 2.0f;
-                    ps->particles[i].pos = intersect + normal * Mag(dir);
+                    HandleBounceCollision(&ps->particles[i],
+                        intersect, normal, deltaTime, BOUNCE_MARGIN);
                 } break;
             }
         }
 
         // Position update
         ps->particles[i].pos += ps->particles[i].vel * deltaTime;
-
-        // Color update
-        float32 alpha = 1.0f - ps->particles[i].life / ps->maxLife;
-        alpha = sqrtf(alpha);
-        ps->particles[i].color.a = alpha;
     }
 
+    if (isGrid) {
+        return;
+    }
     // Remove expired particles
     int p = 0;
     int active = ps->active;
@@ -347,12 +521,14 @@ void DrawParticleSystem(ParticleSystemGL psGL,
     Mat4 vp = proj * view;
 
     int active = (int)ps->active;
-    for (int i = 0; i < active; i++) {
-        Vec4 transformed = vp * ToVec4(ps->particles[i].pos, 1.0f);
-        ps->particles[i].depth = transformed.z;
+    if (ps->width == 0 && ps->height == 0) {
+        for (int i = 0; i < active; i++) {
+            Vec4 transformed = vp * ToVec4(ps->particles[i].pos, 1.0f);
+            ps->particles[i].depth = transformed.z;
+        }
+        qsort((void*)ps->particles, active, sizeof(Particle),
+            DepthComparator);
     }
-    qsort((void*)ps->particles, active, sizeof(Particle),
-        DepthComparator);
     for (int i = 0; i < active; i++) {
         dataGL->pos[i] = ps->particles[i].pos;
         dataGL->color[i] = ps->particles[i].color;

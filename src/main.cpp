@@ -67,6 +67,34 @@ internal void InitParticleRandom(ParticleSystem* ps, Particle* particle,
     float randSize = RandFloat() * 0.1f + 0.05f;
     particle->size = { randSize, randSize };
     particle->bounceMult = 1.0f;
+    particle->frictionMult = 1.0f;
+}
+
+internal void InitParticleSphere(ParticleSystem* ps, Particle* particle,
+    void* data)
+{
+    const float32 radius = 2.0f;
+
+    particle->life = 0.0f;
+    Vec3 sphereDir;
+    float32 mag;
+    do {
+        sphereDir.x = RandFloat(-1.0f, 1.0f);
+        sphereDir.y = RandFloat(-1.0f, 1.0f);
+        sphereDir.z = RandFloat(-1.0f, 1.0f);
+        mag = Mag(sphereDir);
+    } while (mag > radius);
+    sphereDir /= mag;
+    particle->pos = sphereDir * radius;
+
+    float32 speed = RandFloat(-0.05f, 0.05f);
+    particle->vel = speed * sphereDir;
+    float32 randColor = RandFloat(0.5f, 1.0f);
+    particle->color = { randColor, randColor, randColor, 1.0f };
+    float randSize = RandFloat() * 0.1f + 0.05f;
+    particle->size = { randSize, randSize };
+    particle->bounceMult = 1.0f;
+    particle->frictionMult = 1.0f;
 }
 
 internal void InitParticleFountain(ParticleSystem* ps, Particle* particle,
@@ -94,32 +122,36 @@ internal void InitParticleFountain(ParticleSystem* ps, Particle* particle,
     float randSize = RandFloat() * 0.1f + 0.05f;
     particle->size = { randSize, randSize };
     particle->bounceMult = RandFloat(0.6f, 1.0f);
+    particle->frictionMult = 1.0f;
 }
 
-internal void InitParticleSphere(ParticleSystem* ps, Particle* particle,
+internal void InitParticleBox(ParticleSystem* ps, Particle* particle,
     void* data)
 {
     const float32 radius = 2.0f;
+    const float32 thickness = 0.2f;
 
     particle->life = 0.0f;
-    Vec3 sphereDir;
     float32 mag;
+    Vec3 diskDir;
     do {
-        sphereDir.x = RandFloat(-1.0f, 1.0f);
-        sphereDir.y = RandFloat(-1.0f, 1.0f);
-        sphereDir.z = RandFloat(-1.0f, 1.0f);
-        mag = Mag(sphereDir);
+        diskDir.x = RandFloat(-1.0f, 1.0f);
+        diskDir.y = 0.0f;
+        diskDir.z = RandFloat(-1.0f, 1.0f);
+        mag = Mag(diskDir);
     } while (mag > radius);
-    sphereDir /= mag;
-    particle->pos = sphereDir * radius;
+    diskDir /= mag;
+    diskDir.y = RandFloat(-thickness, thickness);
+    particle->pos = diskDir * radius;
 
     float32 speed = RandFloat(-0.05f, 0.05f);
-    particle->vel = speed * sphereDir;
+    particle->vel = speed * diskDir;
     float32 randColor = RandFloat(0.5f, 1.0f);
     particle->color = { randColor, randColor, randColor, 1.0f };
-    float randSize = RandFloat() * 0.1f + 0.05f;
+    float randSize = RandFloat() * 0.05f + 0.02f;
     particle->size = { randSize, randSize };
-    particle->bounceMult = 1.0f;
+    particle->bounceMult = 0.8f;
+    particle->frictionMult = 1.0f;
 }
 
 internal Vec3 RandomPointInTriangle(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 normal)
@@ -137,7 +169,7 @@ internal Vec3 RandomPointInTriangle(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 normal)
     float32 dotOut = Dot(randPt - v1, out);
     if (dotOut > 0.0f) {
         randPt -= dotOut * out;
-        return Vec3::zero;
+        //return randPt;
     }
 
     return randPt;
@@ -181,6 +213,7 @@ internal void InitParticleMesh(ParticleSystem* ps, Particle* particle,
     float randSize = RandFloat() * 0.04f + 0.02f;
     particle->size = { randSize, randSize };
     particle->bounceMult = 1.0f;
+    particle->frictionMult = 1.0f;
 }
 
 internal void InitParticleSphereJet(ParticleSystem* ps, Particle* particle,
@@ -208,6 +241,45 @@ internal void InitParticleSphereJet(ParticleSystem* ps, Particle* particle,
     float randSize = RandFloat() * 0.1f + 0.05f;
     particle->size = { randSize, randSize };
     particle->bounceMult = RandFloat(0.6f, 1.0f);
+    particle->frictionMult = 1.0f;
+}
+
+internal void InitParticleFireSwirl(ParticleSystem* ps, Particle* particle,
+    void* data)
+{
+    particle->life = 0.0f;
+    const float32 radius = 1.0f;
+    const float32 thickness = 0.2f;
+
+    particle->life = 0.0f;
+    float32 mag;
+    Vec3 diskDir;
+    do {
+        diskDir.x = RandFloat(-1.0f, 1.0f);
+        diskDir.y = 0.0f;
+        diskDir.z = RandFloat(-1.0f, 1.0f);
+        mag = Mag(diskDir);
+    } while (mag > radius);
+    diskDir /= mag;
+    diskDir.y = RandFloat(-thickness, thickness);
+    particle->pos = diskDir * radius;
+
+    float32 meanSpeed = 1.5f;
+    float32 speedD = 0.1f;
+    float32 speed = RandFloat(meanSpeed - speedD, meanSpeed + speedD);
+    Vec3 tangent = Cross(particle->pos, Vec3::unitY);
+    float velY = 0.1f;
+    tangent.y = RandFloat(-velY, velY);
+    particle->vel = Normalize(tangent) * speed;
+
+    float32 randColor = RandFloat(0.5f, 1.0f);
+    particle->color = { randColor, randColor, randColor, 1.0f };
+
+    float randSize = RandFloat() * 0.1f + 0.05f;
+    particle->size = { randSize, randSize };
+
+    particle->bounceMult = 1.0f;
+    particle->frictionMult = 1.0f;
 }
 
 internal void PresetChange(Button* button, void* data)
@@ -237,31 +309,41 @@ internal void PresetChange(Button* button, void* data)
                 InitParticleSphere, gameState->pTexSpark,
                 nullptr, nullptr);
         } break;
-        case PRESET_FOUNTAIN_SINK: {
+        case PRESET_FOUNTAIN_SINK:
+        case PRESET_FOUNTAIN_BOUNCE: {
             PlaneCollider groundPlane;
             groundPlane.type = COLLIDER_SINK;
             groundPlane.normal = Vec3::unitY;
             groundPlane.point = Vec3::zero;
+            int maxParticles = 10000;
+            int particlesPerSec = 2000;
+            if (preset == PRESET_FOUNTAIN_BOUNCE) {
+                groundPlane.type = COLLIDER_BOUNCE;
+                maxParticles = particlesPerSec;
+            }
             CreateParticleSystem(&gameState->ps,
-                10000, 1000, 10.0f, Vec3 { 0.0f, -1.0f, 0.0f },
-                0.1f, 0.05f,
-                nullptr, 0, &groundPlane, 1, nullptr, 0, nullptr, 0,
-                InitParticleFountain, gameState->pTexBase,
-                nullptr, nullptr);
-        } break;
-        case PRESET_FOUNTAIN_BOUNCE: {
-            PlaneCollider groundPlane;
-            groundPlane.type = COLLIDER_BOUNCE;
-            groundPlane.normal = Vec3::unitY;
-            groundPlane.point = Vec3::zero;
-            CreateParticleSystem(&gameState->ps,
-                1500, 1500, 10.0f, Vec3 { 0.0f, -1.0f, 0.0f },
+                maxParticles, particlesPerSec, 15.0f,
+                Vec3 { 0.0f, -1.0f, 0.0f },
                 0.1f, 0.05f,
                 nullptr, 0, &groundPlane, 1, nullptr, 0, nullptr, 0,
                 InitParticleFountain, gameState->pTexBase,
                 nullptr, nullptr);
         } break;
         case PRESET_BOX_COLLIDERS: {
+            Attractor a[2];
+            AxisBoxCollider boxes[2];
+
+            a[0].pos = Vec3::zero;
+            a[0].strength = 0.75f;
+            boxes[0].type = COLLIDER_BOUNCE;
+            boxes[0].min = -Vec3::one;
+            boxes[0].max = Vec3::one;
+            CreateParticleSystem(&gameState->ps,
+                MAX_PARTICLES, 100, 5.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                0.1f, 0.05f,
+                a, 1, nullptr, 0, boxes, 1, nullptr, 0,
+                InitParticleBox, gameState->pTexFire,
+                nullptr, nullptr);
         } break;
         case PRESET_SPHERE_COLLIDERS: {
             SphereCollider spheres[3];
@@ -292,7 +374,7 @@ internal void PresetChange(Button* button, void* data)
             a[3].pos = Vec3 { -5.0f, 5.0, -5.0f };
             a[3].strength = 2.0f;
             CreateParticleSystem(&gameState->ps,
-                10000, 1000, 10.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                10000, 600, 10.0f, Vec3 { 0.0f, 0.0f, 0.0f },
                 0.2f, 0.2f,
                 a, 4, nullptr, 0, nullptr, 0, nullptr, 0,
                 InitParticleRandom, gameState->pTexBase,
@@ -305,6 +387,55 @@ internal void PresetChange(Button* button, void* data)
                 nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0,
                 InitParticleMesh, gameState->pTexBase,
                 &gameState->loadedMesh, &gameState->loadedMeshGL);
+        } break;
+        case PRESET_CLOTH:
+        case PRESET_CLOTH_OFFSET: {
+            PlaneCollider groundPlane;
+            groundPlane.type = COLLIDER_BOUNCE;
+            groundPlane.normal = Vec3::unitY;
+            groundPlane.point = Vec3 { 0.0f, -1.2f, 0.0f };
+            SphereCollider sphere;
+            sphere.type = COLLIDER_BOUNCE;
+            sphere.center = Vec3::zero;
+            sphere.radius = 1.0f;
+
+            int dim = 70; // dim x dim cloth
+            float32 clothLength = 2.0f;
+            float32 hookeK = 1000.0f;
+            float32 hookeEqDist = clothLength / dim;
+            Vec3 center = Vec3 { 0.0f, 2.0f, 0.0f };
+            if (preset == PRESET_CLOTH_OFFSET) {
+                center = Vec3 { 1.3f, 2.0f, 0.1f };
+            }
+            Vec3 origin = center;
+            origin.x -= clothLength / 2.0f;
+            origin.z -= clothLength / 2.0f;
+            Vec3 strideX = Vec3 { hookeEqDist, 0.0f, 0.0f };
+            Vec3 strideY = Vec3 { 0.0f, 0.0f, hookeEqDist };
+            CreateParticleSystem(&gameState->ps,
+                dim, dim, origin, strideX, strideY,
+                Vec3 { 0.0f, -0.4f, 0.0f }, hookeK, hookeEqDist,
+                0.1f, 0.05f,
+                nullptr, 0, &groundPlane, 1, nullptr, 0, &sphere, 1,
+                gameState->pTexSphere);
+        } break;
+        case PRESET_FIRE_SWIRL: {
+            const int attractors = 20;
+            const float len = 10.0f;
+            Vec3 start = -len / 2.0f * Vec3::unitY;
+            Vec3 end = len / 2.0f * Vec3::unitY;
+            Attractor a[attractors];
+            for (int i = 0; i < attractors; i++) {
+                float t = (float32)i / (attractors - 1);
+                a[i].pos = Lerp(start, end, t);
+                a[i].strength = powf(t * 2.0f - 1.0f, 5.0f) + 0.2f;
+            }
+            CreateParticleSystem(&gameState->ps,
+                10000, 500, 20.0f, Vec3 { 0.0f, 0.0f, 0.0f },
+                0.0f, 0.0f,
+                a, attractors, nullptr, 0, nullptr, 0, nullptr, 0,
+                InitParticleFireSwirl, gameState->pTexFire,
+                nullptr, nullptr);
         } break;
 
         case PRESET_LAST: {
@@ -431,7 +562,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         gameState->modelRot = QuatFromAngleUnitAxis(PI_F / 6.0f, Vec3::unitX)
             * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
 
-        gameState->drawColliders = false;
+        gameState->drawColliders = true;
 
         gameState->rectGL = InitRectGL(thread,
             platformFuncs->DEBUGPlatformReadFile,
@@ -528,7 +659,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 
         Vec2Int modelFieldOrigin = {
             drawCollidersOrigin.x,
-            drawCollidersOrigin.y + drawCollidersSize.y + UI_SPACING * 2
+            drawCollidersOrigin.y + drawCollidersSize.y + UI_SPACING * 4
         };
         Vec2Int modelFieldSize = drawCollidersSize;
         gameState->modelField = CreateInputField(
@@ -544,15 +675,6 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         cmData.DEBUGPlatformFreeFileMemory =
             platformFuncs->DEBUGPlatformFreeFileMemory;
         ChangeMesh(&gameState->modelField, (void*)&cmData);
-        /*char meshPath[256];
-        sprintf(meshPath, "data/models/%s", defaultMesh_);
-        gameState->loadedMesh = LoadMeshFromObj(thread,
-            meshPath,
-            platformFuncs->DEBUGPlatformReadFile,
-            platformFuncs->DEBUGPlatformFreeFileMemory);
-        gameState->loadedMeshGL = LoadMeshGL(thread, gameState->loadedMesh,
-            platformFuncs->DEBUGPlatformReadFile,
-            platformFuncs->DEBUGPlatformFreeFileMemory);*/
 
         // Initializes particle system
         PresetChange(&gameState->presetButtons[gameState->activePreset],
@@ -589,6 +711,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     || input->keyboard[KM_KEY_A].isDown) {
         gameState->cameraPos -= right * deltaTime;
     }
+    gameState->cameraPos += forward * 0.002f * (float32)input->mouseWheelDelta;
 
     UpdatePresetLayout(gameState, screenInfo);
     UpdateButtons(gameState->presetButtons, PRESET_LAST,

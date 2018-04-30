@@ -25,6 +25,7 @@ struct Particle
     Vec4 color;
     Vec2 size;
     float32 bounceMult;
+    float32 frictionMult;
 
     float32 depth;
 };
@@ -91,6 +92,11 @@ struct ParticleSystem
 
     Mesh* mesh;
     MeshGL* meshGL;
+
+    // Grid mode
+    int width, height;
+    float32 hookeEqDist;
+    float32 hookeStrength;
 };
 
 struct ParticleSystemGL
@@ -124,6 +130,15 @@ void CreateParticleSystem(ParticleSystem* ps, int maxParticles,
     SphereCollider* sphereColliders, int numSphereColliders,
     InitParticleFunction initParticleFunc, GLuint texture,
     Mesh* mesh, MeshGL* meshGL);
+void CreateParticleSystem(ParticleSystem* ps,
+    int width, int height, Vec3 origin, Vec3 strideX, Vec3 strideY,
+    Vec3 gravity, float32 hookeStrength, float32 hookeEqDist,
+    float32 linearDamp, float32 quadraticDamp,
+    Attractor* attractors, int numAttractors,
+    PlaneCollider* planeColliders, int numPlaneColliders,
+    AxisBoxCollider* boxColliders, int numBoxColliders,
+    SphereCollider* sphereColliders, int numSphereColliders,
+    GLuint texture);
 void UpdateParticleSystem(ParticleSystem* ps, float32 deltaTime, void* data);
 void DrawParticleSystem(ParticleSystemGL psGL,
     PlaneGL planeGL, BoxGL boxGL, MeshGL sphereMeshGL,

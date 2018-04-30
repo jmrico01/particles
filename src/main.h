@@ -9,6 +9,9 @@
 
 enum Preset
 {
+    PRESET_FIRE_SWIRL,
+    PRESET_CLOTH_OFFSET,
+    PRESET_CLOTH,
     PRESET_MESH,
     PRESET_ATTRACTORS,
     PRESET_SPHERE_COLLIDERS,
@@ -21,6 +24,9 @@ enum Preset
 };
 
 global_var const char* presetNames_[PRESET_LAST] = {
+    "Fire Swirl",
+    "Cloth (Off-Center)",
+    "Cloth",
     "Mesh Uniform",
     "Attractors",
     "Sphere Collider",

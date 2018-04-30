@@ -1,0 +1,144 @@
+<head>
+    <title> COS426 Assignment 4 &mdash; Animation &mdash; Writeup</title>
+    <link href="css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+    <script src="js/student.js"> </script>
+    <script src="js/writeup.js"> </script>
+    <div class="top">
+    <div class="main_div">
+
+        <h1> <div class=assignment>COS426 Assignment 4</div>Animation &mdash; Writeup</h1>
+        <div class='selectable'>
+        <h2 id='student'></h2>
+        
+        Features Implemented:
+<ul>
+<li>(1.0) <a href='#Euler'>Euler</a></li>
+<li>(1.0) <a href='#Sphere+source'>Sphere source</a></li>
+<li>(1.0) <a href='#Animated+mesh'>Animated mesh</a></li>
+<li>(1.0) <a href='#Dapming'>Damping</a></li>
+<li>(1.0) <a href='#Uniform+distribution'>Uniform distribution</a></li>
+<li>(1.0) <a href='#Ground+plane'>Ground plane</a></li>
+<li>(1.0) <a href='#Axis+box'>Axis box</a></li>
+<li>(1.0) <a href='#Sphere+collision'>Sphere collision</a></li>
+<li>(2.0) <a href='#Spring+system'>Spring system</a></li>
+<li>(3.0) <a href='#Your+system'>Your system</a></li>
+<li>(1.0) <a href='#Rendering'>Rendering</a></li>
+<li>(1.0) <a href='#Art'>Art</a></li>
+        </ul></div>
+
+<p><hr><p><a name='Important Note'></a><h1>Important Note</h1><p><hr><p>
+
+Once more, I developed this assignment almost from scratch in C++. I'm using the Win32 API for window creation and input, FreeType for font file bitmap loading, libPNG for particle texture loading, and occasionally some borrowed code from online sources, which is all properly cited.
+
+<p>
+I had to re-implement many of the given systems for this assignment. These include, but are probably not limited to:
+<ul>
+    <li>Win32 platform layer, heavily inspired by <a href="https://handmadehero.org/">Handmade Hero</a></li>
+    <li>Implementing a reasonably efficient particle system for drawing (using OpenGL instancing), spawning, removing, etc</li>
+    <li>Dealing with all sorts of crazyness of particle z-sorting plus translucent mesh renders**</li>
+    <li>Implementation of collision systems that can (hopefully) run on a wide range of framerates or time steps</li>
+    <li>Text rendering, with the help of FreeType and OpenGL</li>
+    <li>Interactive GUI elements in pixel coordinates</li>
+    <li>PNG format image loading using libPNG and OpenGL loading</li>
+    <li>Math library with Vectors, Matrices, Quaternions</li>
+</ul>
+
+<p>**I didn't actually solve this completely. I am rendering all 3D meshes with GL_DEPTH_TEST <b>disabled</b>, which means their triangles aren't properly z-sorted. However, since they are translucent, this isn't too noticeable.
+
+<p>I am turning in a Windows executable, titled "particles_win32.exe", which is in the "build" directory. The library file "particles_game.dll" is there as a product of my development environment: it contains all non-Windows-specific code, and gets dynamically linked to the executable. The "data" directory contains all 3D models, textures, and font files. All libraries are statically linked, so the program should require no external libraries other than the Visual C++ runtime.</p>
+
+<h2>Controls</h2>
+
+<p>The GUI controls are similar to my previous assignments. Clicking and dragging rotates the camera, WASD or the arrow keys move the camera as in a first-person videogame. Scrolling can also be used to move forward and backward. Clicking on things allows you to interact with them. Clicking on the input fields (boxes with text), typing, <i>and pressing ENTER</i> allows you to change their values (specifically the loaded model file, in this assignment).</p>
+
+<p><hr><p><a name='Euler'></a><h1>Euler</h1><p><hr><p>
+All the particle update logic (except for particle spawning) is located <i>in the function UpdateParticleSystem, in particles.cpp.</i> Euler movement is the first thing I implemented: I simply looped through the collection of particles, added gravity and attractors to their velocities, scaled by the time step deltaTime, and then added their velocities to their positions, scaled by deltaTime as well.
+
+<p><hr><p><a name='Sphere+source'></a><h1>Sphere source</h1><p><hr><p>
+Implemented in <i>InitParticleSphere, on main.cpp</i>. These InitParticleX functions are passed on to the particle system, to be called whenever a particle is spawned. I used the rejection sampling approach discussed in the lecture on particle systems: generate random x, y, z independently in [-1, 1], until you obtain a vector whose magnitude is at most 1. Then, normalize and scale by the desired sphere radius.
+
+<p>
+<img src='results/sphere.png'/>
+
+<p><hr><p><a name='Animated+mesh'></a><h1>Animated mesh</h1><p><hr><p>
+Implemented in <i>InitParticleMesh, on main.cpp</i>, with uniform distribution (implementation details on that section). DISCLAIMER: I hope you'll forgive me for not spawning these on an animated model. It was a lot of work to implement 3D model animation into my system, and the implementation for this did not depend at all on the model being animated or not. If the input Mesh on my function were to be changing every frame, this would still work.
+
+<p><hr><p><a name='Damping'></a><h1>Damping</h1><p><hr><p>
+Each frame, <i>UpdateParticleSystem (particles.cpp)</i> damps the velocity based on the linear and quadratic damping terms. Specifically, each frame, I subtract (linearDamp * velocity + quadraticDamp * mag(velocity) * velocity) from the velocity, scaled by deltaTime.
+
+<p><hr><p><a name='Uniform+distribution'></a><h1>Uniform distribution</h1><p><hr><p>
+I first select a face uniformly at random (weighted by their area). I do this by generating a random floating point number between 0 and the total area of the mesh, then taking a rolling, cumulative sum of the face areas, and selecting the face which makes this cumulative sum greater than the generated random number.
+
+<p>I triangulate all my meshes, so once I have selected a face, I have to figure out how to generate a random point in a triangle, given its vertices. If the assignment had more than triangulated faces, it would be easy to select a triangle within the face, using the same procedure as before: split the polygon into triangles, uniformly pick one at random, weighted by their area.
+
+<p>To generate a random point inside a triangle with vertices v0, v1, v2, I generate two random values a1, a2 in the range [0, 1]. Then, a1 * (v1 - v0) + a2 * (v2 - v0) gives me a random point in the parallelogram (v0, v1, v1 + v2, v2). For points inside the triangle, I simply return them. For points outside the triangle, I reflect them along the edge (v1, v2), and return them.
+
+<p>
+<img src='results/mesh1.png'/>
+<p>
+<img src='results/mesh2.png'/>
+
+<p><hr><p><a name='Ground+plane'></a><h1>Ground plane</h1><p><hr><p>
+Implemented in the colliders section of <i>UpdateParticleSystem in particles.cpp</i>. I use the ray starting at the particle position and going forward along its velocity scaled by deltaTime. From this I try to compute the parameter t along which the intersection with the plane occurs (t = 0 means at the position, t = 1 means at position + velocity * deltaTime). I use this method for other collision detections.
+
+<p>I make sure the ray isn't parallel to the plane first. Then, I compute t from the distance of the particle position to the plane. If t is in the range [0, 1], there will be a collision in this frame. For all sink collider types, I destroy the particle by setting its life to past its maximum life. For bounce collider types, I use the helper function <i>HandleBounceCollision in particles.cpp</i> to compute their resulting positions and velocities, from the intersection point and the normal at the intersection. In this case, the intersection point is position + velocity * deltaTime * t, and the normal is the plane normal.
+
+<p>HandleBounceCollision splits the velocity into normal and tangent components. I scale the velocity's normal component by "bounceMult" and its tangent component by "frictionMult", both of which are per-particle parameters. I set the position to the intersection point, offset by a small value along the intersection normal.
+
+<p>NOTE: I tested this on my roommate's computer, as I usually do. Ocasionally, the framerate dropped for a couple of frames, and the particles fell through the plane. This is hard to test, however, and I wasn't able to replicate it.
+
+<p>
+<img src='results/plane1.png'/>
+
+<p><hr><p><a name='Axis+box'></a><h1>Axis box</h1><p><hr><p>
+Like the plane collision, I use a ray intersection method, for which I referred to my raytracer assignment. I look for the closest intersection of the ray with the box planes. If there is none, I don't do anything. Otherwise, I either destroy the particle, or bounce it using HandleBounceCollision, and the appropriate intersection point and normal.
+
+<p>
+<img src='results/box1.png'/>
+
+<p><hr><p><a name='Sphere+collision'></a><h1>Sphere collision</h1><p><hr><p>
+Again, I use a ray intersection method, almost exactly like the one in my raytracer assignment. I look for an intersection, and either destroy the particle or call HandleBounceCollision.
+
+<p>
+<img src='results/sphere1.png'/>
+
+<p><hr><p><a name='Spring+system'></a><h1>Spring system</h1><p><hr><p>
+Implemented in <i>UpdateParticleSystem, particles.cpp</i>. My application's ParticleSystem struct can be initialized in two ways: in the more common, particles-per-second, spawning and removing state, or in a grid state, where no particles are spawned or removed, there is a width, height, and spacing, there is no z-sorting of particles every frame to keep their memory layout the same, and where each particle feels Hooke forces from its neighbors.
+
+<p>The Hooke forces are calculate in the UpdateParticleSystem function for each neighbor of every particle. This could be made more efficient, since this force is symmetrical. Each particle calls CalculateHookeForce on every neighbor, which calculates the Hooke force from the parameters hookeEqDist (equilibrium distance) and hookeStrength (k).
+
+<p>Note that I had to make the "k" parameter very strong, and the friction coefficient for the particles quite aggresive (around 0.5 friction dampening) for the centered cloth effect to work properly. This means that the offset cloth takes a while to slide off the sphere (though it eventually does).
+
+<p>
+<img src='results/springs1.png'/>
+<p>
+<img src='results/springs2.png'/>
+
+<p><hr><p><a name='Your+system'></a><h1>Your system</h1><p><hr><p>
+This entire assignment was literally making "my own cool particle system" from scratch. However, there are many more things I would have liked to do, which I can at least mention.
+
+<ul>
+    <li>Applying some post-processing filters (such as bloom) for a dramatic effect, especially with fire particles</li>
+    <li>Using animated textures, cycling for each particle. Also very cool for fire, or sparks, or other things. This wouldn't have been too difficult: add an additional instanced buffer on top of position and color for UVs, and change UVs of each particle based on which animation frame it is on.</li>
+    <li>GPU acceleration of particle simulations (something I wanted to experiment with). I feel I would run into many issues here, especially for transparent particles, since I would need the CPU to sort them. I could definitely use float32-format textures in OpenGL to store positions, velocities, etc, and update particles on shaders. Even the spring system would be quite GPU friendly (only depends on the 2D neighbors, sounds cheap, texture-sampling-wise). However, sorting would probably be an issue. Maybe for additive particles this would be a good fit?</li>
+</ul>
+
+<p>Alas, I must do other school work, and prepare for an interview tomorrow.
+
+<p><hr><p><a name='Rendering'></a><h1>Rendering</h1><p><hr><p>
+I have made the alpha value of each particle's color scale with the square root of its remaining life. This makes particles mostly vibrant throughout their lives, but gives them a sharp decay to transparent right before they are destroyed.
+
+<p><hr><p><a name='Art'></a><h1>Art</h1><p><hr><p>
+The attractors setup here had a cool effect, like a black hole pulling apart a nearby star. The alpha value decrease in addition to the bilinear sampling for each particle gives this a nice blurry touch which feels like a depth-of-field / motion blur effect.
+
+
+<p>
+<img src='results/art1.png'/>
+
+    </div>
+    </div>
+</body>
+</html>
